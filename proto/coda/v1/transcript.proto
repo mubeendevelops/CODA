@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package coda.v1;
+
+option go_package = "coda/go/internal/genproto/coda/v1;codev1";
+
+// SpeakerRole is the assigned role of a diarized speaker cluster, produced by
+// the few-shot llama-3.1-8b-instant role classifier (architecture.md §1.2 asr-service).
+enum SpeakerRole {
+  SPEAKER_ROLE_UNSPECIFIED = 0;
+  SPEAKER_ROLE_DOCTOR = 1;
+  SPEAKER_ROLE_PATIENT = 2;
+  SPEAKER_ROLE_UNKNOWN = 3;
+}
+
+// Word is one Whisper word-level token, aligned to a diarization cluster.
+message Word {
+  string text = 1;
+  uint32 start_ms = 2;
+  uint32 end_ms = 3;
+  float confidence = 4;
+  string speaker_cluster_id = 5;  // raw diarization cluster, before role assignment
+}
+
+// SpeakerCluster is one pyannote diarization cluster with its assigned role.
+message SpeakerCluster {
+  string cluster_id = 1;
+  SpeakerRole assigned_role = 2;
+  float confidence = 3;
+}
+
+// Turn is one speaker-labeled, timestamped utterance in the assembled transcript.
+message Turn {
+  uint32 turn_index = 1;
+  SpeakerRole speaker_label = 2;
+  uint32 start_ms = 3;
+  uint32 end_ms = 4;
+  string text = 5;
+  string text_redacted = 6;       // set after REDACT_RUNNING; only this ever enters a prompt
+  float confidence = 7;
+  repeated Word words = 8;
+}
+
+// Transcript is the ASR-stage output artifact.
+message Transcript {
+  string consultation_id = 1;
+  string run_config_id = 2;
+  string language = 3;            // "en" | "kn_en"
+  string asr_backend = 4;         // "groq" | "faster_whisper_local"
+  string asr_model = 5;
+  repeated Turn turns = 6;
+  repeated SpeakerCluster speaker_clusters = 7;
+  optional float wer = 8;         // null unless measured against a reference (Phase 2)
+  optional float der = 9;
+}

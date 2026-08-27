@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package coda.v1;
+
+import "coda/v1/transcript.proto";
+
+option go_package = "coda/go/internal/genproto/coda/v1;codev1";
+
+// ThoughtCategory buckets a thought toward the 8-field distillation target
+// (claude_context.md §3 / §6).
+enum ThoughtCategory {
+  THOUGHT_CATEGORY_UNSPECIFIED = 0;
+  THOUGHT_CATEGORY_SYMPTOM = 1;
+  THOUGHT_CATEGORY_HISTORY = 2;
+  THOUGHT_CATEGORY_MEDICATION = 3;
+  THOUGHT_CATEGORY_ALLERGY = 4;
+  THOUGHT_CATEGORY_EXAMINATION = 5;
+  THOUGHT_CATEGORY_DIAGNOSIS = 6;
+  THOUGHT_CATEGORY_INVESTIGATION = 7;
+  THOUGHT_CATEGORY_PLAN = 8;
+  THOUGHT_CATEGORY_OTHER = 9;
+}
+
+// EdgeType distinguishes rule-derived temporal edges from LLM-predicted edges
+// (claude_context.md §6 — "GAT (attention propagation)" row).
+enum EdgeType {
+  EDGE_TYPE_UNSPECIFIED = 0;
+  EDGE_TYPE_TEMPORAL = 1;
+  EDGE_TYPE_CAUSAL = 2;
+  EDGE_TYPE_LOGICAL = 3;
+}
+
+enum PredictedBy {
+  PREDICTED_BY_UNSPECIFIED = 0;
+  PREDICTED_BY_RULE = 1;
+  PREDICTED_BY_LLM = 2;
+}
+
+// LinkedEntity is one MeSH/ICD-10 grounding of a span inside a thought's text
+// (architecture.md §1.2 nlp-service; ADR-0010).
+message LinkedEntity {
+  string text = 1;
+  string mesh_id = 2;
+  string icd10_code = 3;
+  string entity_type = 4;
+}
+
+// Thought is the node-construction unit: (speaker, text, entities, category,
+// temporal_anchor, turn_id) per claude_context.md §6.
+message Thought {
+  string id = 1;
+  string consultation_id = 2;
+  string run_config_id = 3;
+  string turn_id = 4;
+  SpeakerRole speaker = 5;
+  string text = 6;
+  repeated LinkedEntity entities = 7;
+  ThoughtCategory category = 8;
+  string temporal_anchor = 9;     // turn order is temporal order in dialogue
+  repeated string linked_concepts = 10;  // MeSH / ICD-10 identifiers
+}
+
+// ThoughtEdge carries the heuristic weight (entity_overlap x edge_type_prior)
+// that substitutes for the trained GAT (ADR-0011).
+message ThoughtEdge {
+  string id = 1;
+  string consultation_id = 2;
+  string run_config_id = 3;
+  string src_thought_id = 4;
+  string dst_thought_id = 5;
+  EdgeType edge_type = 6;
+  float weight = 7;
+  PredictedBy predicted_by = 8;
+}
+
+// ThoughtGraph is the nlp-service artifact serialized for graph-structured
+// context retrieval and for the case-study figures (plan.md Phase 6).
+message ThoughtGraph {
+  string consultation_id = 1;
+  string run_config_id = 2;
+  repeated Thought thoughts = 3;
+  repeated ThoughtEdge edges = 4;
+}

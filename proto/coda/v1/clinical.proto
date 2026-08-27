@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package coda.v1;
+
+option go_package = "coda/go/internal/genproto/coda/v1;codev1";
+
+// FieldKey enumerates the 8 clinical fields (claude_context.md §3). This
+// taxonomy is load-bearing: it is both the distillation target and the unit
+// of field-level evaluation, so it is a closed enum rather than a free string.
+enum FieldKey {
+  FIELD_KEY_UNSPECIFIED = 0;
+  FIELD_KEY_CHIEF_COMPLAINT = 1;
+  FIELD_KEY_HOPI = 2;
+  FIELD_KEY_PAST_MEDICAL_HISTORY = 3;
+  FIELD_KEY_MEDICATIONS = 4;
+  FIELD_KEY_ALLERGIES = 5;
+  FIELD_KEY_EXAMINATION_FINDINGS = 6;
+  FIELD_KEY_PROVISIONAL_DIAGNOSIS = 7;
+  FIELD_KEY_INVESTIGATIONS_ADVISED = 8;
+  FIELD_KEY_TREATMENT_PLAN = 9;
+}
+
+enum NoteStatus {
+  NOTE_STATUS_UNSPECIFIED = 0;
+  NOTE_STATUS_DRAFT = 1;
+  NOTE_STATUS_UNDER_REVIEW = 2;
+  NOTE_STATUS_APPROVED = 3;
+}
+
+// FieldValue carries provenance on every extracted value. Absent information
+// is an empty `value` — never a guess. An unsupported non-null value is a
+// hallucination and is scored as one (claude_context.md §3).
+message FieldValue {
+  string value = 1;                        // empty means "not stated" — never a guess
+  repeated uint32 source_turn_ids = 2;
+  float confidence = 3;
+  repeated string linked_concepts = 4;      // MeSH / ICD-10 identifiers
+}
+
+// MedicationsAllergies is field #4, the one object-typed field in the schema.
+message MedicationsAllergies {
+  repeated FieldValue medications = 1;      // dose/frequency folded into value where stated
+  repeated FieldValue allergies = 2;
+}
+
+// ClinicalNote is the hierarchical-distillation output: the 8 fields plus the
+// consultation summary (claude_context.md §3).
+message ClinicalNote {
+  string consultation_id = 1;
+  string run_config_id = 2;
+  uint32 version = 3;
+  NoteStatus status = 4;
+
+  FieldValue chief_complaint = 5;
+  FieldValue hopi = 6;
+  repeated FieldValue past_medical_history = 7;
+  MedicationsAllergies medications_allergies = 8;
+  FieldValue examination_findings = 9;
+  repeated FieldValue provisional_diagnosis = 10;
+  repeated FieldValue investigations_advised = 11;
+  FieldValue treatment_plan = 12;
+
+  string approved_by = 13;    // user id; empty until approved
+  string approved_at = 14;    // RFC3339; empty until approved
+}
+
+// Summary is the consultation summary, scored separately from the 8 fields.
+message Summary {
+  string consultation_id = 1;
+  string run_config_id = 2;
+  string text = 3;
+  optional float rouge_l = 4;
+  optional float bertscore = 5;
+}

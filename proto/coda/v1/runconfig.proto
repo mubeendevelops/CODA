@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package coda.v1;
+
+option go_package = "coda/go/internal/genproto/coda/v1;codev1";
+
+// ScorerWeights are the relevance/consistency/redundancy weights used to
+// compute ScoreBreakdown.aggregate (claude_context.md §6).
+message ScorerWeights {
+  float relevance = 1;
+  float consistency = 2;
+  float redundancy = 3;
+}
+
+// RunConfig is the ablation configuration object. Every reported result must
+// be reconstructible from the database alone (architecture.md §6, ADR-0012):
+// configuration cannot live in env vars, CLI flags, or edited source.
+//
+// content_hash = sha256(canonical_json(RunConfig)); configs are interned,
+// never duplicated, and run_config_id is stamped on every downstream row and
+// artifact key.
+message RunConfig {
+  string arm = 1;                    // baseline | got_k1 | got_k2 | got_k2_nograph | got_k2_kg | frontier_ref
+  uint32 schema_version = 2;
+
+  // Models — pinned per role, never inherited from env at runtime.
+  string base_model = 3;             // system under test, e.g. llama-3.3-70b-versatile
+  string judge_model = 4;            // e.g. openai/gpt-oss-20b
+  string structural_model = 5;       // e.g. llama-3.1-8b-instant
+  string embed_model = 6;            // e.g. all-MiniLM-L6-v2
+  string asr_backend = 7;            // groq | faster_whisper_local
+  string asr_model = 8;
+
+  // GoT knobs — the ablation dimensions.
+  bool got_enabled = 9;
+  uint32 n_candidates = 10;          // N
+  uint32 k_iterations = 11;          // K
+  bool graph_context_enabled = 12;   // graph-retrieved context vs full transcript
+  bool kg_enabled = 13;              // MeSH/ICD-10 augmentation on/off
+  string kg_backend = 14;            // scispacy_mesh | rapidfuzz_mesh | none
+  ScorerWeights scorer_weights = 15;
+
+  // Determinism.
+  float temperature = 16;
+  float top_p = 17;
+  uint32 seed = 18;
+  string prompt_set_hash = 19;       // sha256 over the versioned prompt files
+
+  bool redaction_enabled = 20;
+}

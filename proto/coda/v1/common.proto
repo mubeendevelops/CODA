@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package coda.v1;
+
+option go_package = "coda/go/internal/genproto/coda/v1;codev1";
+
+// Stage identifies a pipeline stage in the state machine (architecture.md §4.1).
+enum Stage {
+  STAGE_UNSPECIFIED = 0;
+  STAGE_ASR = 1;
+  STAGE_REDACT = 2;
+  STAGE_NLP = 3;
+  STAGE_EXPORT = 4;
+}
+
+// Status is the worker's classification of a stage outcome (architecture.md §2.5).
+// The worker classifies; the orchestrator decides the resulting action.
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_OK = 1;
+  STATUS_RETRYABLE = 2;
+  STATUS_FATAL = 3;
+  STATUS_QUOTA_EXHAUSTED = 4;
+  STATUS_CANCELLED = 5;
+}
+
+// ArtifactKind is a closed enum (architecture.md §3.3) so object-storage keys
+// never carry free-text artifact-type strings.
+enum ArtifactKind {
+  ARTIFACT_KIND_UNSPECIFIED = 0;
+  ARTIFACT_KIND_AUDIO = 1;
+  ARTIFACT_KIND_CONSENT = 2;
+  ARTIFACT_KIND_TRANSCRIPT = 3;
+  ARTIFACT_KIND_THOUGHT_GRAPH = 4;
+  ARTIFACT_KIND_CANDIDATE_SET = 5;
+  ARTIFACT_KIND_CLINICAL_NOTE = 6;
+  ARTIFACT_KIND_SUMMARY = 7;
+  ARTIFACT_KIND_EXPORT_JSON = 8;
+  ARTIFACT_KIND_EXPORT_PDF = 9;
+  ARTIFACT_KIND_METRICS = 10;
+  ARTIFACT_KIND_REDACTION_MAP = 11;
+}
+
+// Error carries the worker's classification of a failure. See architecture.md §2.5.
+message Error {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
+  string provider_status = 4;
+}
+
+// StageMetrics carries the token/latency accounting that the cost-per-consultation
+// figure in plan.md Phase 10 is computed from.
+message StageMetrics {
+  uint64 tokens_in = 1;
+  uint64 tokens_out = 2;
+  uint32 llm_calls = 3;
+  uint32 cache_hits = 4;
+  uint64 wall_ms = 5;
+  repeated string model_ids = 6;
+  double cost_estimate = 7;
+}
+
+// ArtifactRef points to an object in MinIO. Artifacts are always passed by
+// reference (ADR-0005) — never inlined into a message.
+message ArtifactRef {
+  string uri = 1;
+  string sha256 = 2;
+  uint64 bytes = 3;
+  string content_type = 4;
+  ArtifactKind kind = 5;
+}

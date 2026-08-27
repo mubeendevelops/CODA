@@ -1,0 +1,13 @@
+# Go codegen only. Python codegen is driven separately by grpc_tools.protoc
+# (see scripts/gen_proto_python.sh) because grpc_tools bundles its own protoc
+# and emits both message classes and gRPC stubs in one well-trodden path,
+# which buf's built-in Python plugin does not cover. buf remains the source
+# of truth for linting and breaking-change detection on the .proto files
+# themselves (ADR-0004).
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: ../go/internal/genproto
+    opt: paths=source_relative
+inputs:
+  - directory: .

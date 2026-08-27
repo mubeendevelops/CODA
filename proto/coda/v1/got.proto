@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package coda.v1;
+
+import "coda/v1/clinical.proto";
+
+option go_package = "coda/go/internal/genproto/coda/v1;codev1";
+
+// Candidate is one of N generated candidates for a field, in one GoT
+// generate/score/refine round (claude_context.md §6, Eq. 19-22 intent).
+message Candidate {
+  uint32 index = 1;
+  FieldKey field_key = 2;
+  string text = 3;
+  repeated string source_thought_ids = 4;
+  string generated_by_model = 5;
+}
+
+// ScoreBreakdown is the 3-criteria score for one candidate. Two of the three
+// criteria are local (MiniLM embedding similarity, n-gram overlap) and cost
+// zero API calls (ADR-0009); only relevance calls the judge model.
+message ScoreBreakdown {
+  float relevance = 1;      // LLM-as-judge rubric + entity overlap with source
+  float consistency = 2;    // local MiniLM embedding similarity to supporting thoughts
+  float redundancy = 3;     // n-gram overlap with prior selections
+  float aggregate = 4;      // weighted sum, weights from RunConfig.scorer_weights
+  string judge_model = 5;   // empty if this score used no LLM call
+}
+
+// CandidateSet is all N candidates and their scores for one field, at one
+// refinement iteration.
+message CandidateSet {
+  string consultation_id = 1;
+  string run_config_id = 2;
+  FieldKey field_key = 3;
+  uint32 iteration = 4;                    // 0-based; 0 .. k_iterations
+  repeated Candidate candidates = 5;
+  repeated ScoreBreakdown scores = 6;      // index-aligned with candidates
+  uint32 selected_index = 7;
+}
+
+// RefinementTrace is the full K-iteration generate/score/select/refine history
+// for one field, serialized for the case-study figures (plan.md Phase 6/10).
+message RefinementTrace {
+  string consultation_id = 1;
+  string run_config_id = 2;
+  FieldKey field_key = 3;
+  repeated CandidateSet iterations = 4;
+  FieldValue final_value = 5;
+}

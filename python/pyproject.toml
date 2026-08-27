@@ -1,0 +1,32 @@
+[project]
+name = "coda-python-workspace"
+version = "0.0.0"
+requires-python = ">=3.11,<3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["coda_proto", "asr-service", "nlp-service"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["coda_proto/src", "asr-service/src", "nlp-service/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "coda_proto/src"
+
+[[tool.mypy.overrides]]
+# grpcio-health-checking ships no py.typed stubs; types-grpcio doesn't cover it.
+module = "grpc_health.*"
+ignore_missing_imports = true

@@ -1,0 +1,53 @@
+# Secrets and local env
+.env
+*.pem
+*.key
+
+# Data — raw audio and anything derived from it never belongs in git
+data/raw/
+data/splits/
+*.wav
+*.mp3
+*.flac
+
+# Go
+go/bin/
+go/*.out
+
+# Python
+python/**/__pycache__/
+python/**/*.pyc
+python/**/.pytest_cache/
+python/**/.mypy_cache/
+python/**/.ruff_cache/
+python/.venv/
+python/**/.venv/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Docker / compose local overrides
+docker-compose.override.yml
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Model caches / large downloads (Phase 2+)
+.cache/
+*.ckpt
+*.safetensors
+
+# Project planning docs (kept local, not tracked)
+plan.md
+Project_Blueprint.md
+Project_Prompts.md
+claude_context.md
+
+# Claude Code local files
+.claude/
+CLAUDE.md

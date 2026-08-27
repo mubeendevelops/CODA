@@ -1,0 +1,62 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=5000"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: buf-lint
+        name: buf lint (proto/coda/v1)
+        entry: bash -c 'cd proto && buf lint'
+        language: system
+        files: ^proto/.*\.proto$
+        pass_filenames: false
+
+      - id: go-fmt
+        name: gofmt
+        entry: bash -c 'cd go && gofmt -l . | (! grep .)'
+        language: system
+        files: ^go/.*\.go$
+        pass_filenames: false
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: bash -c 'cd go && golangci-lint run ./...'
+        language: system
+        files: ^go/.*\.go$
+        pass_filenames: false
+
+      - id: ruff-asr
+        name: ruff (asr-service)
+        entry: bash -c 'cd python && uv run --project asr-service ruff check asr-service/src asr-service/tests'
+        language: system
+        files: ^python/asr-service/.*\.py$
+        pass_filenames: false
+
+      - id: ruff-nlp
+        name: ruff (nlp-service)
+        entry: bash -c 'cd python && uv run --project nlp-service ruff check nlp-service/src nlp-service/tests'
+        language: system
+        files: ^python/nlp-service/.*\.py$
+        pass_filenames: false
+
+      - id: eslint-frontend
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: prettier-frontend
+        name: prettier --check (frontend)
+        entry: bash -c 'cd frontend && npm run format'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|css|json|md)$
+        pass_filenames: false

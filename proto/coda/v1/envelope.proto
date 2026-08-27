@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package coda.v1;
+
+import "coda/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "coda/go/internal/genproto/coda/v1;codev1";
+
+// StageEnvelope is the message the orchestrator XADDs to stage.asr / stage.nlp.
+// See architecture.md §2.2.
+message StageEnvelope {
+  string job_id = 1;              // ULID
+  string consultation_id = 2;     // ULID
+  Stage stage = 3;
+  uint32 attempt = 4;             // 1-based
+  string idempotency_key = 5;     // sha256(consultation_id . stage . run_config_id . input_sha256)
+  string trace_id = 6;            // W3C traceparent, propagated end-to-end
+  uint32 schema_version = 7;      // envelope + payload contract version
+  string run_config_id = 8;       // FK to run_configs — pins models, N, K, flags
+  string payload_ref = 9;         // object-storage URI; NEVER inline data
+  google.protobuf.Timestamp enqueued_at = 10;
+  google.protobuf.Timestamp deadline = 11;   // absolute; worker aborts past it
+  map<string, string> labels = 12;           // eval_run_id, arm, org_id — for filtering
+}
+
+// StageResult mirrors StageEnvelope and is published to stage.results.
+message StageResult {
+  string job_id = 1;
+  string consultation_id = 2;
+  Stage stage = 3;
+  uint32 attempt = 4;
+  string idempotency_key = 5;
+  string trace_id = 6;
+  uint32 schema_version = 7;
+  Status status = 8;
+  string result_ref = 9;          // object-storage URI of the stage output
+  Error error = 10;
+  StageMetrics metrics = 11;
+  google.protobuf.Timestamp resume_after = 12;  // set when status == STATUS_QUOTA_EXHAUSTED
+}
+
+// StageHeartbeat is emitted every 15s while a worker is processing, so the
+// orchestrator's reaper can distinguish "slow" from "stalled" (architecture.md §2.4).
+message StageHeartbeat {
+  string job_id = 1;
+  Stage stage = 2;
+  uint32 attempt = 3;
+  float percent_complete = 4;
+  string step = 5;
+  string trace_id = 6;
+  google.protobuf.Timestamp at = 7;
+}
+
+// AttemptError records one failed attempt inside a DeadLetter's full history.
+message AttemptError {
+  uint32 attempt = 1;
+  Error error = 2;
+  google.protobuf.Timestamp occurred_at = 3;
+}
+
+// DeadLetter is published to stage.dlq when a message exceeds its stage's max
+// attempts or receives a FATAL status. Nothing is silently dropped.
+message DeadLetter {
+  string job_id = 1;
+  string consultation_id = 2;
+  Stage stage = 3;
+  StageEnvelope original_envelope = 4;
+  repeated AttemptError attempts = 5;
+  Status final_status = 6;
+  google.protobuf.Timestamp dead_lettered_at = 7;
+}
