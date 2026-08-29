@@ -48,6 +48,24 @@ func SetAction(ctx context.Context, action string) {
 	}
 }
 
+// SetBefore attaches a pre-mutation snapshot to the audit entry — for a
+// handler whose action deletes or overwrites the resource (DPDP erasure,
+// hard delete), this is the only record of what existed once the request
+// completes, since the row itself may be gone by the time Middleware writes
+// the entry.
+func SetBefore(ctx context.Context, before []byte) {
+	if s, ok := ctx.Value(stateContextKey).(*state); ok {
+		s.before = before
+	}
+}
+
+// SetAfter attaches a post-mutation snapshot to the audit entry.
+func SetAfter(ctx context.Context, after []byte) {
+	if s, ok := ctx.Value(stateContextKey).(*state); ok {
+		s.after = after
+	}
+}
+
 // MarkClinicalRead flags the current request as a read of clinical data, so
 // Middleware logs it even though GET requests are not audited by default
 // (only mutations are, unless flagged). Call this from any handler that

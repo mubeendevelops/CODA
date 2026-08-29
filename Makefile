@@ -12,7 +12,7 @@ endif
 .PHONY: proto generate build build-go build-python build-frontend \
         test test-go test-python test-frontend test-integration \
         lint lint-go lint-python lint-frontend \
-        up down migrate migrate-test seed e2e clean
+        up down migrate migrate-test seed e2e clean openapi-lint
 
 ## proto: regenerate Go + Python types from proto/coda/v1/*.proto (commits generated code).
 proto:
@@ -101,6 +101,14 @@ seed:
 ## e2e: end-to-end pipeline test against a running stack (Phase 1+ — nothing to test yet).
 e2e:
 	@echo "no e2e path yet — implemented in Phase 1 (vertical slice)"
+
+## openapi-lint: sanity-check openapi/coda-v1.yaml parses as YAML with the
+## expected top-level shape. Not a full OpenAPI schema validator — the spec
+## is hand-authored against go/internal/http/router.go (see its header
+## comment), not generated, so there is no codegen step to fail loudly if
+## the two drift; this at least catches YAML syntax errors.
+openapi-lint:
+	python3 -c "import yaml; d = yaml.safe_load(open('openapi/coda-v1.yaml')); assert 'paths' in d and len(d['paths']) > 0; print(f\"OK: {len(d['paths'])} paths\")"
 
 ## clean: remove build artifacts and stop the stack, keeping caches and volumes.
 clean: down

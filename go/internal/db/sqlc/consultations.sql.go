@@ -63,6 +63,24 @@ func (q *Queries) CreateConsultation(ctx context.Context, arg CreateConsultation
 	return &i, err
 }
 
+const deleteConsultation = `-- name: DeleteConsultation :exec
+DELETE FROM consultations WHERE id = $1
+`
+
+// Full cascading deletion (not the EraseConsultation tombstone above) —
+// explicitly requested for DELETE /consultations/{id}: every FK from
+// jobs/artifacts/transcripts/turns/thoughts/thought_edges/extractions/
+// summaries/clinical_notes/reviews/review_edits down to consultations is
+// ON DELETE CASCADE, so this one statement removes the whole subtree.
+// consent_records is untouched (consultations -> consent_records is ON
+// DELETE RESTRICT, the compliance record outlives the consultation).
+// The caller must capture what it needs for the audit `before` snapshot
+// and delete MinIO objects *before* calling this — the row is gone after.
+func (q *Queries) DeleteConsultation(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteConsultation, id)
+	return err
+}
+
 const eraseConsultation = `-- name: EraseConsultation :one
 UPDATE consultations
 SET source_audio_uri = NULL,
@@ -131,25 +149,28 @@ SELECT id, org_id, owner_user_id, consent_record_id, consent_obtained, consent_m
 FROM consultations
 WHERE org_id = $1
   AND ($4::text IS NULL OR state = $4::text)
+  AND ($5::text IS NULL OR language = $5::text)
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
 `
 
 type ListConsultationsByOrgAndStateParams struct {
-	OrgID  uuid.UUID   `db:"org_id" json:"org_id"`
-	Limit  int32       `db:"limit" json:"limit"`
-	Offset int32       `db:"offset" json:"offset"`
-	State  pgtype.Text `db:"state" json:"state"`
+	OrgID    uuid.UUID   `db:"org_id" json:"org_id"`
+	Limit    int32       `db:"limit" json:"limit"`
+	Offset   int32       `db:"offset" json:"offset"`
+	State    pgtype.Text `db:"state" json:"state"`
+	Language pgtype.Text `db:"language" json:"language"`
 }
 
-// Query pattern: list consultations by org with a status filter.
-// Pass state = NULL to list every state for the org.
+// Query pattern: list/filter/paginate consultations by org, org-scoped.
+// Pass state/language = NULL to not filter on that dimension.
 func (q *Queries) ListConsultationsByOrgAndState(ctx context.Context, arg ListConsultationsByOrgAndStateParams) ([]*Consultation, error) {
 	rows, err := q.db.Query(ctx, listConsultationsByOrgAndState,
 		arg.OrgID,
 		arg.Limit,
 		arg.Offset,
 		arg.State,
+		arg.Language,
 	)
 	if err != nil {
 		return nil, err
@@ -184,6 +205,54 @@ func (q *Queries) ListConsultationsByOrgAndState(ctx context.Context, arg ListCo
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateConsultationAudio = `-- name: UpdateConsultationAudio :one
+UPDATE consultations
+SET source_audio_uri = $2, audio_sha256 = $3, duration_sec = $4
+WHERE id = $1
+RETURNING id, org_id, owner_user_id, consent_record_id, consent_obtained, consent_method, consent_recorded_at, state, language, source_audio_uri, audio_sha256, duration_sec, cancel_requested, erased_at, created_at, updated_at
+`
+
+type UpdateConsultationAudioParams struct {
+	ID             uuid.UUID     `db:"id" json:"id"`
+	SourceAudioUri pgtype.Text   `db:"source_audio_uri" json:"source_audio_uri"`
+	AudioSha256    pgtype.Text   `db:"audio_sha256" json:"audio_sha256"`
+	DurationSec    pgtype.Float8 `db:"duration_sec" json:"duration_sec"`
+}
+
+// Written by the audio-confirm endpoint once StatObject verifies the
+// upload landed — source_audio_uri/audio_sha256/duration_sec are direct
+// columns on consultations (architecture.md §5.2), not an `artifacts` row:
+// the raw source recording isn't run-config-dependent the way stage
+// outputs are, and `artifacts.run_config_id` is NOT NULL.
+func (q *Queries) UpdateConsultationAudio(ctx context.Context, arg UpdateConsultationAudioParams) (*Consultation, error) {
+	row := q.db.QueryRow(ctx, updateConsultationAudio,
+		arg.ID,
+		arg.SourceAudioUri,
+		arg.AudioSha256,
+		arg.DurationSec,
+	)
+	var i Consultation
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.OwnerUserID,
+		&i.ConsentRecordID,
+		&i.ConsentObtained,
+		&i.ConsentMethod,
+		&i.ConsentRecordedAt,
+		&i.State,
+		&i.Language,
+		&i.SourceAudioUri,
+		&i.AudioSha256,
+		&i.DurationSec,
+		&i.CancelRequested,
+		&i.ErasedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
 }
 
 const updateConsultationState = `-- name: UpdateConsultationState :one

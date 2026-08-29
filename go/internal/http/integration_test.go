@@ -15,6 +15,8 @@ package http
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,6 +32,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/testcontainers/testcontainers-go"
+	tcminio "github.com/testcontainers/testcontainers-go/modules/minio"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
@@ -38,6 +41,8 @@ import (
 	"coda/go/internal/config"
 	"coda/go/internal/db"
 	"coda/go/internal/db/sqlc"
+	"coda/go/internal/queue"
+	"coda/go/internal/storage"
 )
 
 const integrationTestPassword = "integration-test-password-1"
@@ -45,12 +50,37 @@ const integrationTestPassword = "integration-test-password-1"
 type testEnv struct {
 	server  *httptest.Server
 	queries *sqlc.Queries
+	storage *storage.Client
 	ctx     context.Context
 }
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
 	ctx := context.Background()
+
+	minioContainer, err := tcminio.Run(ctx, "minio/minio:RELEASE.2024-01-16T16-07-38Z")
+	if err != nil {
+		t.Fatalf("start minio container: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := minioContainer.Terminate(context.Background()); err != nil {
+			t.Logf("terminate minio container: %v", err)
+		}
+	})
+	minioEndpoint, err := minioContainer.ConnectionString(ctx)
+	if err != nil {
+		t.Fatalf("minio connection string: %v", err)
+	}
+	storageClient, err := storage.NewClient(ctx, config.Storage{
+		Endpoint:  minioEndpoint,
+		AccessKey: minioContainer.Username,
+		SecretKey: minioContainer.Password,
+		Bucket:    "coda-test",
+		UseSSL:    false,
+	}, "test")
+	if err != nil {
+		t.Fatalf("construct storage client: %v", err)
+	}
 
 	pgContainer, err := tcpostgres.Run(ctx, "postgres:16",
 		tcpostgres.WithDatabase("coda_test"),
@@ -121,12 +151,14 @@ func newTestEnv(t *testing.T) *testEnv {
 		Logger:      logger,
 		ServerCfg:   serverCfg,
 		AuthCfg:     authCfg,
+		Storage:     storageClient,
+		Enqueuer:    queue.NoopEnqueuer{Logger: logger},
 	})
 
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
 
-	return &testEnv{server: server, queries: queries, ctx: ctx}
+	return &testEnv{server: server, queries: queries, storage: storageClient, ctx: ctx}
 }
 
 func runMigrations(t *testing.T, dsn string) {
@@ -230,6 +262,28 @@ func decodeJSON[T any](t *testing.T, resp *http.Response) T {
 		t.Fatalf("decode response: %v", err)
 	}
 	return v
+}
+
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+// putRaw uploads bytes directly to a presigned URL, bypassing env.server —
+// exactly what a real client does (docs/architecture.md §1.2: audio bytes
+// never transit go-api).
+func putRaw(t *testing.T, url, contentType string, body []byte) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("build presigned PUT request: %v", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("do presigned PUT: %v", err)
+	}
+	return resp
 }
 
 func (env *testEnv) login(t *testing.T, email, password string) tokenResponse {
@@ -561,4 +615,477 @@ func TestIntegration_AuditLogRecordsMutationsAndClinicalReads(t *testing.T) {
 	if !sawLogin {
 		t.Error("expected an audit entry for auth.login")
 	}
+}
+
+// --- consultation/job API: happy path + error paths ---------------------
+
+func TestIntegration_CreateConsultation(t *testing.T) {
+	env := newTestEnv(t)
+	org := mustCreateOrg(t, env, "Create Consultation Org")
+	doctor := mustCreateUser(t, env, org.ID, "doctor@create-consult.dev", auth.RoleDoctor)
+	reviewer := mustCreateUser(t, env, org.ID, "reviewer@create-consult.dev", auth.RoleReviewer)
+	doctorTokens := env.login(t, doctor.Email, integrationTestPassword)
+	reviewerTokens := env.login(t, reviewer.Email, integrationTestPassword)
+
+	t.Run("happy path defaults language to en and records consent", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations", doctorTokens.AccessToken, map[string]any{
+			"consent": map[string]any{"consent_obtained": true, "consent_type": "verbal"},
+		})
+		if resp.StatusCode != http.StatusCreated {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("status = %d, want 201: %s", resp.StatusCode, b)
+		}
+		c := decodeJSON[consultationResponse](t, resp)
+		if c.Language != "en" {
+			t.Errorf("language = %q, want en", c.Language)
+		}
+		if c.State != "consent_recorded" {
+			t.Errorf("state = %q, want consent_recorded", c.State)
+		}
+	})
+
+	t.Run("consent_obtained=false is rejected with 422", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations", doctorTokens.AccessToken, map[string]any{
+			"consent": map[string]any{"consent_obtained": false, "consent_type": "verbal"},
+		})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+	})
+
+	t.Run("missing consent entirely is rejected with 422", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations", doctorTokens.AccessToken, map[string]any{})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+	})
+
+	t.Run("non-en language is rejected with 422, not silently relabeled", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations", doctorTokens.AccessToken, map[string]any{
+			"language": "kn_en",
+			"consent":  map[string]any{"consent_obtained": true, "consent_type": "verbal"},
+		})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+		body := decodeJSON[map[string]string](t, resp)
+		if body["error"] == "" {
+			t.Error("expected a non-empty error message explaining multilingual support isn't implemented")
+		}
+	})
+
+	t.Run("reviewer cannot create a consultation", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations", reviewerTokens.AccessToken, map[string]any{
+			"consent": map[string]any{"consent_obtained": true, "consent_type": "verbal"},
+		})
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("status = %d, want 403", resp.StatusCode)
+		}
+	})
+}
+
+func TestIntegration_AudioPresignAndConfirm(t *testing.T) {
+	env := newTestEnv(t)
+	org := mustCreateOrg(t, env, "Audio Upload Org")
+	doctor := mustCreateUser(t, env, org.ID, "doctor@audio-upload.dev", auth.RoleDoctor)
+	tokens := env.login(t, doctor.Email, integrationTestPassword)
+	consult := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+
+	audioBytes := []byte("RIFF....WAVEfmt fake audio content for integration test")
+	digest := sha256Hex(audioBytes)
+
+	t.Run("presign rejects an unsupported content type", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/audio/presign", tokens.AccessToken,
+			map[string]any{"content_type": "video/mp4", "size_bytes": len(audioBytes), "sha256": digest})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+	})
+
+	t.Run("presign rejects an oversized upload", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/audio/presign", tokens.AccessToken,
+			map[string]any{"content_type": "audio/wav", "size_bytes": storage.MaxAudioUploadBytes + 1, "sha256": digest})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+	})
+
+	t.Run("confirm before upload returns 409", func(t *testing.T) {
+		neverUploadedKey := env.storage.SourceAudioKey(consult.ID, digest, "wav")
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/audio/confirm", tokens.AccessToken,
+			map[string]any{"object_key": neverUploadedKey, "sha256": digest, "duration_sec": 12.5})
+		if resp.StatusCode != http.StatusConflict {
+			t.Errorf("status = %d, want 409", resp.StatusCode)
+		}
+	})
+
+	var objectKey string
+	t.Run("presign then direct PUT then confirm is the happy path", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/audio/presign", tokens.AccessToken,
+			map[string]any{"content_type": "audio/wav", "size_bytes": len(audioBytes), "sha256": digest})
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("presign status = %d, want 200: %s", resp.StatusCode, b)
+		}
+		presigned := decodeJSON[audioPresignResponse](t, resp)
+		objectKey = presigned.ObjectKey
+
+		putResp := putRaw(t, presigned.UploadURL, "audio/wav", audioBytes)
+		if putResp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(putResp.Body)
+			t.Fatalf("direct PUT to presigned URL status = %d: %s", putResp.StatusCode, b)
+		}
+		_ = putResp.Body.Close()
+
+		confirmResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/audio/confirm", tokens.AccessToken,
+			map[string]any{"object_key": objectKey, "sha256": digest, "duration_sec": 12.5})
+		if confirmResp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(confirmResp.Body)
+			t.Fatalf("confirm status = %d, want 200: %s", confirmResp.StatusCode, b)
+		}
+		c := decodeJSON[consultationResponse](t, confirmResp)
+		if c.State != "uploaded" {
+			t.Errorf("state = %q, want uploaded", c.State)
+		}
+	})
+
+	t.Run("confirm rejects an object_key outside this consultation's namespace", func(t *testing.T) {
+		other := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+		foreignKey := env.storage.SourceAudioKey(other.ID, digest, "wav")
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/audio/confirm", tokens.AccessToken,
+			map[string]any{"object_key": foreignKey, "sha256": digest, "duration_sec": 12.5})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+	})
+}
+
+// mustUploadAudio drives the full presign -> PUT -> confirm sequence so
+// job/result tests can start from a consultation with confirmed audio
+// without repeating it inline.
+func mustUploadAudio(t *testing.T, env *testEnv, token string, consultID uuid.UUID) {
+	t.Helper()
+	audioBytes := []byte(fmt.Sprintf("fake-audio-%s", uuid.NewString()))
+	digest := sha256Hex(audioBytes)
+
+	resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consultID.String()+"/audio/presign", token,
+		map[string]any{"content_type": "audio/wav", "size_bytes": len(audioBytes), "sha256": digest})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("presign status = %d, want 200", resp.StatusCode)
+	}
+	presigned := decodeJSON[audioPresignResponse](t, resp)
+
+	putResp := putRaw(t, presigned.UploadURL, "audio/wav", audioBytes)
+	if putResp.StatusCode != http.StatusOK {
+		t.Fatalf("direct PUT status = %d, want 200", putResp.StatusCode)
+	}
+	_ = putResp.Body.Close()
+
+	confirmResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consultID.String()+"/audio/confirm", token,
+		map[string]any{"object_key": presigned.ObjectKey, "sha256": digest, "duration_sec": 30.0})
+	if confirmResp.StatusCode != http.StatusOK {
+		t.Fatalf("confirm status = %d, want 200", confirmResp.StatusCode)
+	}
+	_ = confirmResp.Body.Close()
+}
+
+func TestIntegration_CreateJob(t *testing.T) {
+	env := newTestEnv(t)
+	org := mustCreateOrg(t, env, "Create Job Org")
+	doctor := mustCreateUser(t, env, org.ID, "doctor@create-job.dev", auth.RoleDoctor)
+	tokens := env.login(t, doctor.Email, integrationTestPassword)
+
+	t.Run("job creation is rejected before audio is uploaded", func(t *testing.T) {
+		consult := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokens.AccessToken, nil)
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+	})
+
+	t.Run("an unknown arm is rejected with 422", func(t *testing.T) {
+		consult := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+		mustUploadAudio(t, env, tokens.AccessToken, consult.ID)
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokens.AccessToken,
+			map[string]any{"arm": "not_a_real_arm"})
+		if resp.StatusCode != http.StatusUnprocessableEntity {
+			t.Errorf("status = %d, want 422", resp.StatusCode)
+		}
+	})
+
+	t.Run("happy path returns 202 immediately with a job id", func(t *testing.T) {
+		consult := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+		mustUploadAudio(t, env, tokens.AccessToken, consult.ID)
+
+		resp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokens.AccessToken, nil)
+		if resp.StatusCode != http.StatusAccepted {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("status = %d, want 202: %s", resp.StatusCode, b)
+		}
+		job := decodeJSON[createJobResponse](t, resp)
+		if job.JobID == uuid.Nil {
+			t.Error("expected a non-nil job id")
+		}
+		if job.Arm != "baseline" {
+			t.Errorf("arm = %q, want baseline (the default)", job.Arm)
+		}
+		if job.State != "asr_queued" {
+			t.Errorf("state = %q, want asr_queued", job.State)
+		}
+	})
+}
+
+func TestIntegration_GetJob(t *testing.T) {
+	env := newTestEnv(t)
+	orgA := mustCreateOrg(t, env, "Get Job Org A")
+	orgB := mustCreateOrg(t, env, "Get Job Org B")
+	doctorA := mustCreateUser(t, env, orgA.ID, "doctor@get-job-a.dev", auth.RoleDoctor)
+	doctorB := mustCreateUser(t, env, orgB.ID, "doctor@get-job-b.dev", auth.RoleDoctor)
+	tokensA := env.login(t, doctorA.Email, integrationTestPassword)
+	tokensB := env.login(t, doctorB.Email, integrationTestPassword)
+
+	consult := mustCreateConsultation(t, env, orgA.ID, doctorA.ID, "en")
+	mustUploadAudio(t, env, tokensA.AccessToken, consult.ID)
+	createResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokensA.AccessToken, nil)
+	job := decodeJSON[createJobResponse](t, createResp)
+
+	t.Run("owning org can read job status with stage detail", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.JobID.String(), tokensA.AccessToken, nil)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		got := decodeJSON[jobResponse](t, resp)
+		if got.State != "asr_queued" {
+			t.Errorf("state = %q, want asr_queued", got.State)
+		}
+		if got.ProgressPercent != 0 {
+			t.Errorf("progress = %d, want 0 (no stages have succeeded yet)", got.ProgressPercent)
+		}
+	})
+
+	t.Run("a different org cannot read this job", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.JobID.String(), tokensB.AccessToken, nil)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+
+	t.Run("unknown job id is 404", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+uuid.NewString(), tokensA.AccessToken, nil)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+}
+
+func TestIntegration_JobEvents(t *testing.T) {
+	env := newTestEnv(t)
+	orgA := mustCreateOrg(t, env, "Job Events Org A")
+	orgB := mustCreateOrg(t, env, "Job Events Org B")
+	doctorA := mustCreateUser(t, env, orgA.ID, "doctor@job-events-a.dev", auth.RoleDoctor)
+	doctorB := mustCreateUser(t, env, orgB.ID, "doctor@job-events-b.dev", auth.RoleDoctor)
+	tokensA := env.login(t, doctorA.Email, integrationTestPassword)
+	tokensB := env.login(t, doctorB.Email, integrationTestPassword)
+
+	consult := mustCreateConsultation(t, env, orgA.ID, doctorA.ID, "en")
+	mustUploadAudio(t, env, tokensA.AccessToken, consult.ID)
+	createResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokensA.AccessToken, nil)
+	job := decodeJSON[createJobResponse](t, createResp)
+
+	t.Run("a different org gets 404, not a stream", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.JobID.String()+"/events", tokensB.AccessToken, nil)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+
+	t.Run("connecting streams an initial SSE frame with the current state", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(env.ctx, 5*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, env.server.URL+"/v1/jobs/"+job.JobID.String()+"/events", nil)
+		if err != nil {
+			t.Fatalf("build request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+tokensA.AccessToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("connect to event stream: %v", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
+			t.Errorf("Content-Type = %q, want text/event-stream", ct)
+		}
+
+		buf := make([]byte, 4096)
+		n, err := resp.Body.Read(buf)
+		if err != nil && n == 0 {
+			t.Fatalf("read from event stream: %v", err)
+		}
+		frame := string(buf[:n])
+		if !bytes.Contains(buf[:n], []byte("event: stage")) {
+			t.Errorf("expected an initial %q event, got: %s", "event: stage", frame)
+		}
+		if !bytes.Contains(buf[:n], []byte(`"state":"asr_queued"`)) {
+			t.Errorf("expected the initial frame to carry the current job state, got: %s", frame)
+		}
+	})
+}
+
+func TestIntegration_ConsultationResult(t *testing.T) {
+	env := newTestEnv(t)
+	org := mustCreateOrg(t, env, "Result Org")
+	doctor := mustCreateUser(t, env, org.ID, "doctor@result.dev", auth.RoleDoctor)
+	tokens := env.login(t, doctor.Email, integrationTestPassword)
+	consult := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+
+	t.Run("409 before any job exists", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/consultations/"+consult.ID.String()+"/result", tokens.AccessToken, nil)
+		if resp.StatusCode != http.StatusConflict {
+			t.Errorf("status = %d, want 409", resp.StatusCode)
+		}
+	})
+
+	mustUploadAudio(t, env, tokens.AccessToken, consult.ID)
+	createResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokens.AccessToken, nil)
+	job := decodeJSON[createJobResponse](t, createResp)
+
+	t.Run("409 while the job is still processing", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/consultations/"+consult.ID.String()+"/result", tokens.AccessToken, nil)
+		if resp.StatusCode != http.StatusConflict {
+			t.Errorf("status = %d, want 409", resp.StatusCode)
+		}
+	})
+
+	// Simulate the pipeline finishing — nothing in this codebase runs the
+	// orchestrator yet (plan.md Phase 3), so the test drives the DB
+	// directly to the point GetConsultationResult expects, the same way a
+	// completed worker eventually will.
+	if _, err := env.queries.UpdateJobState(env.ctx, sqlc.UpdateJobStateParams{ID: job.JobID, State: "awaiting_review"}); err != nil {
+		t.Fatalf("advance job state: %v", err)
+	}
+	noteJSON := []byte(`{"chief_complaint":{"value":"cough","source_turn_ids":[1],"confidence":0.9}}`)
+	if _, err := env.queries.CreateClinicalNote(env.ctx, sqlc.CreateClinicalNoteParams{
+		ConsultationID: consult.ID, RunConfigID: job.RunConfigID, Version: 1, Status: "draft", Note: noteJSON,
+	}); err != nil {
+		t.Fatalf("create clinical note: %v", err)
+	}
+
+	t.Run("200 with the assembled result once the note exists", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/consultations/"+consult.ID.String()+"/result", tokens.AccessToken, nil)
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("status = %d, want 200: %s", resp.StatusCode, b)
+		}
+		got := decodeJSON[consultationResultResponse](t, resp)
+		if got.JobID != job.JobID {
+			t.Errorf("job_id = %v, want %v", got.JobID, job.JobID)
+		}
+		if len(got.ClinicalNote) == 0 {
+			t.Error("expected a non-empty clinical_note")
+		}
+	})
+}
+
+func TestIntegration_ListConsultationsFilterAndPaginate(t *testing.T) {
+	env := newTestEnv(t)
+	org := mustCreateOrg(t, env, "List Filter Org")
+	doctor := mustCreateUser(t, env, org.ID, "doctor@list-filter.dev", auth.RoleDoctor)
+	tokens := env.login(t, doctor.Email, integrationTestPassword)
+
+	c1 := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+	c2 := mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+	_ = mustCreateConsultation(t, env, org.ID, doctor.ID, "en")
+	if _, err := env.queries.UpdateConsultationState(env.ctx, sqlc.UpdateConsultationStateParams{ID: c2.ID, State: "uploaded"}); err != nil {
+		t.Fatalf("advance c2 state: %v", err)
+	}
+	_ = c1
+
+	t.Run("state filter narrows the list", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/consultations?state=uploaded", tokens.AccessToken, nil)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		list := decodeJSON[[]consultationResponse](t, resp)
+		if len(list) != 1 || list[0].ID != c2.ID {
+			t.Errorf("state=uploaded filter returned %d results, want exactly c2", len(list))
+		}
+	})
+
+	t.Run("limit paginates", func(t *testing.T) {
+		resp := env.doJSON(t, http.MethodGet, "/v1/consultations?limit=1", tokens.AccessToken, nil)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status = %d, want 200", resp.StatusCode)
+		}
+		list := decodeJSON[[]consultationResponse](t, resp)
+		if len(list) != 1 {
+			t.Errorf("limit=1 returned %d results, want 1", len(list))
+		}
+	})
+}
+
+func TestIntegration_DeleteConsultation(t *testing.T) {
+	env := newTestEnv(t)
+	orgA := mustCreateOrg(t, env, "Delete Org A")
+	orgB := mustCreateOrg(t, env, "Delete Org B")
+	doctorA := mustCreateUser(t, env, orgA.ID, "doctor@delete-a.dev", auth.RoleDoctor)
+	doctorB := mustCreateUser(t, env, orgB.ID, "doctor@delete-b.dev", auth.RoleDoctor)
+	reviewerA := mustCreateUser(t, env, orgA.ID, "reviewer@delete-a.dev", auth.RoleReviewer)
+	tokensA := env.login(t, doctorA.Email, integrationTestPassword)
+	tokensB := env.login(t, doctorB.Email, integrationTestPassword)
+	reviewerTokensA := env.login(t, reviewerA.Email, integrationTestPassword)
+
+	t.Run("reviewer cannot delete", func(t *testing.T) {
+		consult := mustCreateConsultation(t, env, orgA.ID, doctorA.ID, "en")
+		resp := env.doJSON(t, http.MethodDelete, "/v1/consultations/"+consult.ID.String(), reviewerTokensA.AccessToken, nil)
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("status = %d, want 403", resp.StatusCode)
+		}
+	})
+
+	t.Run("a different org cannot delete this consultation", func(t *testing.T) {
+		consult := mustCreateConsultation(t, env, orgA.ID, doctorA.ID, "en")
+		resp := env.doJSON(t, http.MethodDelete, "/v1/consultations/"+consult.ID.String(), tokensB.AccessToken, nil)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("status = %d, want 404", resp.StatusCode)
+		}
+	})
+
+	t.Run("deletion removes the row, cascades, and deletes the audio object", func(t *testing.T) {
+		consult := mustCreateConsultation(t, env, orgA.ID, doctorA.ID, "en")
+		mustUploadAudio(t, env, tokensA.AccessToken, consult.ID)
+		refreshed, err := env.queries.GetConsultation(env.ctx, consult.ID)
+		if err != nil {
+			t.Fatalf("get consultation after upload: %v", err)
+		}
+		if !refreshed.SourceAudioUri.Valid {
+			t.Fatal("expected source_audio_uri to be set after upload")
+		}
+		audioKey := refreshed.SourceAudioUri.String
+
+		resp := env.doJSON(t, http.MethodDelete, "/v1/consultations/"+consult.ID.String(), tokensA.AccessToken, nil)
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("status = %d, want 200: %s", resp.StatusCode, b)
+		}
+
+		if _, err := env.queries.GetConsultation(env.ctx, consult.ID); err == nil {
+			t.Error("expected the consultation row to be gone after deletion")
+		}
+
+		if _, err := env.storage.StatObject(env.ctx, audioKey); err == nil {
+			t.Error("expected the audio object to be removed from storage after deletion")
+		} else if !storage.IsNotFound(err) {
+			t.Errorf("expected a not-found error, got: %v", err)
+		}
+
+		getResp := env.doJSON(t, http.MethodGet, "/v1/consultations/"+consult.ID.String(), tokensA.AccessToken, nil)
+		if getResp.StatusCode != http.StatusNotFound {
+			t.Errorf("GET after delete status = %d, want 404", getResp.StatusCode)
+		}
+	})
 }

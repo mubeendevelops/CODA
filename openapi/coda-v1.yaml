@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: CODA go-api
+  description: >
+    REST control plane for CODA (docs/architecture.md §1.2). Hand-authored
+    against the actual chi routes in go/internal/http/router.go — kept in
+    sync manually rather than via reflection-based codegen (no OpenAPI
+    generation tooling was already wired into this project's Go toolchain;
+    see claude_context.md's implementation notes for why). Every path,
+    method, and status code below matches a route that exists in the
+    router today.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080/v1
+    description: dev Compose (docs/architecture.md §1.1)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      summary: Exchange email/password for an access + refresh token pair.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TokenResponse" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/refresh:
+    post:
+      operationId: refresh
+      summary: Rotate a refresh token. Reuse of an already-rotated token revokes its whole family.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TokenResponse" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Revoke exactly the presented refresh token. Idempotent.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /auth/register:
+    post:
+      operationId: register
+      summary: Create a user in the caller's own org. admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { description: Email already registered }
+
+  /users:
+    get:
+      operationId: listUsers
+      summary: List every user in the caller's own org. admin-only.
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/User" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /audit-log:
+    get:
+      operationId: listAuditLog
+      summary: List audit_log entries for the caller's own org. admin | auditor.
+      parameters:
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Offset" }
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AuditLogEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /consultations:
+    get:
+      operationId: listConsultations
+      summary: List/filter/paginate consultations, org-scoped. admin | doctor | reviewer.
+      parameters:
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Offset" }
+        - name: state
+          in: query
+          description: Filter to one pipeline_state value (docs/architecture.md §4.1). Omit for every state.
+          schema: { type: string }
+        - name: language
+          in: query
+          description: Filter to one language value. v1 data is always "en" (claude_context.md §2.1).
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Consultation" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createConsultation
+      summary: Create a consultation with its owning consent record. admin | doctor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateConsultationRequest" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Consultation" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422":
+          description: >
+            consent.consent_obtained was not true, consent.consent_type was
+            missing, or language was anything other than "en" (v1 is
+            English-only — see claude_context.md §2.1; never silently
+            relabeled).
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /consultations/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/ConsultationId" }
+    get:
+      operationId: getConsultation
+      summary: Fetch one consultation by ID, org-scoped. admin | doctor | reviewer.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Consultation" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteConsultation
+      summary: >
+        Cascading deletion (DPDP erasure requirement): every artifact object
+        in MinIO for this consultation, then the consultations row and
+        everything that cascades from it (jobs, transcripts, thoughts,
+        clinical_notes, reviews, ...). consent_records is retained. Audit-
+        logged with a before-snapshot, since the row is gone afterward.
+        admin | doctor.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { deleted: { type: boolean }, id: { type: string, format: uuid } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /consultations/{id}/audio/presign:
+    parameters:
+      - { $ref: "#/components/parameters/ConsultationId" }
+    post:
+      operationId: presignConsultationAudio
+      summary: >
+        Get a time-limited MinIO PUT URL. Audio bytes go directly from the
+        caller to object storage — go-api never touches them
+        (docs/architecture.md §1.2). admin | doctor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AudioPresignRequest" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AudioPresignResponse" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Unsupported content_type, size_bytes out of range, or a malformed sha256, or the consultation was erased.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "503": { description: Object storage is not configured on this deployment. }
+
+  /consultations/{id}/audio/confirm:
+    parameters:
+      - { $ref: "#/components/parameters/ConsultationId" }
+    post:
+      operationId: confirmConsultationAudio
+      summary: >
+        Verify the presigned upload landed (MinIO StatObject) and record it
+        as the consultation's source audio (uploaded -> pipeline_state).
+        admin | doctor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AudioConfirmRequest" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Consultation" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The object has not been uploaded to MinIO yet — the presigned PUT has not completed.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "422":
+          description: Malformed sha256/duration_sec, or object_key does not belong to this consultation.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /consultations/{id}/jobs:
+    parameters:
+      - { $ref: "#/components/parameters/ConsultationId" }
+    post:
+      operationId: createJob
+      summary: >
+        Enqueue one pipeline run. Never blocks on processing — returns 202
+        once the job row is durably created; go-orchestrator (not yet
+        built, plan.md Phase 3) is the actual consumer.
+        admin | doctor.
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateJobRequest" }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { $ref: "#/components/schemas/Job" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Audio has not been uploaded yet, the consultation was erased, or arm is not one of the known ablation arms.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /consultations/{id}/result:
+    parameters:
+      - { $ref: "#/components/parameters/ConsultationId" }
+    get:
+      operationId: getConsultationResult
+      summary: >
+        Assembled transcript, clinical note, summary, and artifact links
+        for the consultation's most recent job. admin | doctor | reviewer.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ConsultationResult" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Still processing — no job exists yet, the job hasn't reached awaiting_review, or the note hasn't been persisted yet.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /jobs/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/JobId" }
+    get:
+      operationId: getJob
+      summary: Job status with per-stage state, a rough progress percentage, timings, and error detail. admin | doctor | reviewer.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Job" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /jobs/{id}/events:
+    parameters:
+      - { $ref: "#/components/parameters/JobId" }
+    get:
+      operationId: jobEvents
+      summary: >
+        Server-Sent Events stream of stage transitions and progress
+        heartbeats. Polls job/job_stages on a 2s interval and emits an
+        `event: stage` frame on change (plus a `: heartbeat` comment every
+        15s), until the job reaches a terminal state, the client
+        disconnects, or 30 minutes elapse.
+      responses:
+        "200":
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ConsultationId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    JobId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+
+  responses:
+    BadRequest:
+      description: Malformed request body.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Authenticated, but the caller's role does not permit this action.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: >
+        Not found — including a resource that exists but belongs to a
+        different org (docs/architecture.md §7.6: cross-org existence must
+        never leak as 403).
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  schemas:
+    Error:
+      type: object
+      properties: { error: { type: string } }
+      required: [error]
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string, format: email }, password: { type: string } }
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties: { refresh_token: { type: string } }
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, example: Bearer }
+        expires_in: { type: integer, description: Seconds until access_token expires. }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        role: { type: string, enum: [admin, doctor, reviewer, auditor] }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        email: { type: string }
+        role: { type: string, enum: [admin, doctor, reviewer, auditor] }
+        active: { type: boolean }
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        actor_user_id: { type: string, format: uuid, nullable: true }
+        actor_service: { type: string }
+        action: { type: string }
+        resource_type: { type: string }
+        resource_id: { type: string }
+        outcome: { type: string, enum: [success, failure] }
+
+    Consultation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        state:
+          type: string
+          description: One pipeline_state value (docs/architecture.md §4.1).
+        language:
+          type: string
+          description: Always "en" in v1 (claude_context.md §2.1) — "kn_en" is a v2 value already legal on the wire/schema.
+
+    CreateConsultationRequest:
+      type: object
+      required: [consent]
+      properties:
+        language:
+          type: string
+          default: en
+          description: Only "en" is accepted in v1; anything else is rejected with 422, never silently relabeled.
+        consent:
+          type: object
+          required: [consent_obtained, consent_type]
+          properties:
+            consent_obtained:
+              type: boolean
+              description: Must be true — an omitted or false value is rejected with 422.
+            consent_type: { type: string, example: verbal }
+            consent_method: { type: string }
+            subject_ref:
+              type: string
+              description: Pseudonymous reference, never a name (docs/architecture.md §5.1). Server-generated if omitted.
+
+    AudioPresignRequest:
+      type: object
+      required: [content_type, size_bytes, sha256]
+      properties:
+        content_type: { type: string, enum: [audio/wav, audio/x-wav, audio/wave, audio/mpeg, audio/mp3] }
+        size_bytes: { type: integer, format: int64, maximum: 524288000 }
+        sha256: { type: string, pattern: "^[0-9a-f]{64}$" }
+
+    AudioPresignResponse:
+      type: object
+      properties:
+        upload_url: { type: string, format: uri }
+        object_key: { type: string }
+        method: { type: string, example: PUT }
+        expires_at: { type: string, format: date-time }
+
+    AudioConfirmRequest:
+      type: object
+      required: [object_key, sha256, duration_sec]
+      properties:
+        object_key: { type: string }
+        sha256: { type: string, pattern: "^[0-9a-f]{64}$" }
+        duration_sec: { type: number, format: double, exclusiveMinimum: 0 }
+
+    CreateJobRequest:
+      type: object
+      properties:
+        arm:
+          type: string
+          default: baseline
+          enum: [baseline, got_k1, got_k2, got_k2_nograph, got_k2_kg, frontier_ref]
+          description: Ablation arm (docs/architecture.md §6.2). Defaults to "baseline" when omitted.
+
+    Job:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        consultation_id: { type: string, format: uuid }
+        run_config_id: { type: string, format: uuid }
+        arm: { type: string }
+        state: { type: string }
+        current_stage: { type: string, enum: [asr, redact, nlp, export] }
+        attempt: { type: integer }
+        resume_after: { type: string, format: date-time, nullable: true }
+        error: { type: object, nullable: true }
+        progress_percent:
+          type: integer
+          description: succeeded-stage-count / 4 * 100 — a rough measure, not a weighted estimate.
+        stages:
+          type: array
+          items: { $ref: "#/components/schemas/JobStage" }
+
+    JobStage:
+      type: object
+      properties:
+        stage: { type: string, enum: [asr, redact, nlp, export] }
+        status: { type: string, enum: [pending, running, succeeded, failed, quota_exhausted, cancelled] }
+        attempt: { type: integer }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        result_ref: { type: string }
+        metrics:
+          type: object
+          description: tokens_in/tokens_out/llm_calls/cache_hits/wall_ms (docs/architecture.md §2.2 StageMetrics).
+
+    ConsultationResult:
+      type: object
+      properties:
+        consultation_id: { type: string, format: uuid }
+        job_id: { type: string, format: uuid }
+        run_config_id: { type: string, format: uuid }
+        state: { type: string }
+        transcript:
+          type: object
+          nullable: true
+          properties:
+            uri: { type: string }
+            asr_backend: { type: string }
+            asr_model: { type: string }
+            language: { type: string }
+            wer: { type: number }
+            der: { type: number }
+        summary:
+          type: object
+          nullable: true
+          properties: { text: { type: string } }
+        clinical_note:
+          type: object
+          nullable: true
+          description: The 8-field JSON note (claude_context.md §3), each field carrying { value, source_turn_ids[], confidence }.
+        artifacts:
+          type: array
+          items:
+            type: object
+            properties: { kind: { type: string }, uri: { type: string } }

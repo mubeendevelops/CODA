@@ -7,6 +7,8 @@ import (
 	"coda/go/internal/auth"
 	"coda/go/internal/config"
 	"coda/go/internal/db/sqlc"
+	"coda/go/internal/queue"
+	"coda/go/internal/storage"
 )
 
 // Handlers holds every dependency the REST handlers need. Constructed once
@@ -18,4 +20,6 @@ type Handlers struct {
 	recorder audit.Recorder
 	logger   *slog.Logger
 	authCfg  config.Auth
+	storage  *storage.Client
+	enqueuer queue.Enqueuer
 }

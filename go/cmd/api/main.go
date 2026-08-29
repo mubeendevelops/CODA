@@ -19,6 +19,8 @@ import (
 	"coda/go/internal/db"
 	"coda/go/internal/db/sqlc"
 	codahttp "coda/go/internal/http"
+	"coda/go/internal/queue"
+	"coda/go/internal/storage"
 	"coda/go/internal/telemetry"
 )
 
@@ -36,7 +38,8 @@ func main() {
 	dbCfg := config.LoadDB()
 	authCfg := config.LoadAuth()
 	serverCfg := config.LoadServer()
-	if err := mustValidate(authCfg, serverCfg); err != nil {
+	storageCfg := config.LoadStorage()
+	if err := mustValidate(authCfg, serverCfg, storageCfg); err != nil {
 		logger.Error("invalid configuration", "error", err)
 		os.Exit(1)
 	}
@@ -51,9 +54,16 @@ func main() {
 	}
 	defer pool.Close()
 
+	storageClient, err := storage.NewClient(ctx, storageCfg, baseCfg.Env)
+	if err != nil {
+		logger.Error("connect to object storage", "error", err)
+		os.Exit(1)
+	}
+
 	queries := sqlc.New(pool)
 	jwtSvc := auth.NewJWTService(authCfg.JWTSigningKey, authCfg.AccessTokenTTL)
 	recorder := audit.NewSQLRecorder(queries)
+	enqueuer := queue.NoopEnqueuer{Logger: logger}
 
 	router := codahttp.NewRouter(codahttp.RouterDeps{
 		ServiceName: serviceName,
@@ -65,6 +75,8 @@ func main() {
 		Logger:      logger,
 		ServerCfg:   serverCfg,
 		AuthCfg:     authCfg,
+		Storage:     storageClient,
+		Enqueuer:    enqueuer,
 	})
 
 	apiSrv := &http.Server{
@@ -94,11 +106,14 @@ func main() {
 // only inspects length, and any returned error string is built from field
 // names and lengths, never JWTSigningKey (docs/architecture.md §0: "no
 // secret ever logged").
-func mustValidate(authCfg config.Auth, serverCfg config.Server) error {
+func mustValidate(authCfg config.Auth, serverCfg config.Server, storageCfg config.Storage) error {
 	if err := authCfg.Validate(); err != nil {
 		return err
 	}
 	if err := serverCfg.Validate(); err != nil {
+		return err
+	}
+	if err := storageCfg.Validate(); err != nil {
 		return err
 	}
 	return nil

@@ -50,6 +50,16 @@ type Querier interface {
 	CreateTranscript(ctx context.Context, arg CreateTranscriptParams) (*Transcript, error)
 	CreateTurn(ctx context.Context, arg CreateTurnParams) (*Turn, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (*User, error)
+	// Full cascading deletion (not the EraseConsultation tombstone above) —
+	// explicitly requested for DELETE /consultations/{id}: every FK from
+	// jobs/artifacts/transcripts/turns/thoughts/thought_edges/extractions/
+	// summaries/clinical_notes/reviews/review_edits down to consultations is
+	// ON DELETE CASCADE, so this one statement removes the whole subtree.
+	// consent_records is untouched (consultations -> consent_records is ON
+	// DELETE RESTRICT, the compliance record outlives the consultation).
+	// The caller must capture what it needs for the audit `before` snapshot
+	// and delete MinIO objects *before* calling this — the row is gone after.
+	DeleteConsultation(ctx context.Context, id uuid.UUID) error
 	// DPDP erasure on consent withdrawal (§7.2): nulls the PII-bearing columns
 	// and sets the tombstone timestamp. The row itself is retained.
 	EraseConsultation(ctx context.Context, id uuid.UUID) (*Consultation, error)
@@ -88,8 +98,8 @@ type Querier interface {
 	ListArtifactsByConsultation(ctx context.Context, arg ListArtifactsByConsultationParams) ([]*Artifact, error)
 	ListAuditLogByOrg(ctx context.Context, arg ListAuditLogByOrgParams) ([]*AuditLog, error)
 	ListAuditLogByResource(ctx context.Context, arg ListAuditLogByResourceParams) ([]*AuditLog, error)
-	// Query pattern: list consultations by org with a status filter.
-	// Pass state = NULL to list every state for the org.
+	// Query pattern: list/filter/paginate consultations by org, org-scoped.
+	// Pass state/language = NULL to not filter on that dimension.
 	ListConsultationsByOrgAndState(ctx context.Context, arg ListConsultationsByOrgAndStateParams) ([]*Consultation, error)
 	// Query pattern: fetch full pipeline artifacts for one consultation.
 	ListExtractionsByConsultationAndRunConfig(ctx context.Context, arg ListExtractionsByConsultationAndRunConfigParams) ([]*Extraction, error)
@@ -118,6 +128,12 @@ type Querier interface {
 	// Written by the mandatory REDACT_RUNNING stage (§7.3); only this text is
 	// ever placed in a prompt.
 	SetTurnRedactedText(ctx context.Context, arg SetTurnRedactedTextParams) (*Turn, error)
+	// Written by the audio-confirm endpoint once StatObject verifies the
+	// upload landed — source_audio_uri/audio_sha256/duration_sec are direct
+	// columns on consultations (architecture.md §5.2), not an `artifacts` row:
+	// the raw source recording isn't run-config-dependent the way stage
+	// outputs are, and `artifacts.run_config_id` is NOT NULL.
+	UpdateConsultationAudio(ctx context.Context, arg UpdateConsultationAudioParams) (*Consultation, error)
 	UpdateConsultationState(ctx context.Context, arg UpdateConsultationStateParams) (*Consultation, error)
 	UpdateEvalRunStatus(ctx context.Context, arg UpdateEvalRunStatusParams) (*EvalRun, error)
 	UpdateJobStageResult(ctx context.Context, arg UpdateJobStageResultParams) (*JobStage, error)

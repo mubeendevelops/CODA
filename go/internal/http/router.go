@@ -16,6 +16,8 @@ import (
 	"coda/go/internal/auth"
 	"coda/go/internal/config"
 	"coda/go/internal/db/sqlc"
+	"coda/go/internal/queue"
+	"coda/go/internal/storage"
 )
 
 // RouterDeps bundles everything the REST router needs to construct its
@@ -30,6 +32,11 @@ type RouterDeps struct {
 	Logger      *slog.Logger
 	ServerCfg   config.Server
 	AuthCfg     config.Auth
+	// Storage may be nil in tests that don't exercise the audio
+	// upload/delete paths — handlers that need it check explicitly and
+	// fail loudly rather than panic (see consultations_handlers.go).
+	Storage  *storage.Client
+	Enqueuer queue.Enqueuer
 }
 
 // NewRouter builds go-api's REST router (docs/architecture.md §1.1, §7.6):
@@ -73,6 +80,8 @@ func NewRouter(d RouterDeps) chi.Router {
 		recorder: d.Recorder,
 		logger:   d.Logger,
 		authCfg:  d.AuthCfg,
+		storage:  d.Storage,
+		enqueuer: d.Enqueuer,
 	}
 
 	r.Route("/v1/auth", func(r chi.Router) {
@@ -102,8 +111,24 @@ func NewRouter(d RouterDeps) chi.Router {
 
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
 			Get("/consultations", h.ListConsultations)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor)).
+			Post("/consultations", h.CreateConsultation)
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
 			Get("/consultations/{id}", h.GetConsultation)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor)).
+			Delete("/consultations/{id}", h.DeleteConsultation)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor)).
+			Post("/consultations/{id}/audio/presign", h.PresignConsultationAudio)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor)).
+			Post("/consultations/{id}/audio/confirm", h.ConfirmConsultationAudio)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor)).
+			Post("/consultations/{id}/jobs", h.CreateJob)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
+			Get("/consultations/{id}/result", h.GetConsultationResult)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
+			Get("/jobs/{id}", h.GetJob)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
+			Get("/jobs/{id}/events", h.JobEvents)
 
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleAuditor)).
 			Get("/audit-log", h.ListAuditLog)
