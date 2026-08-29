@@ -123,6 +123,8 @@ func NewRouter(d RouterDeps) chi.Router {
 			Post("/consultations/{id}/audio/confirm", h.ConfirmConsultationAudio)
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor)).
 			Post("/consultations/{id}/jobs", h.CreateJob)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor)).
+			Post("/consultations/{id}/cancel", h.CancelConsultation)
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
 			Get("/consultations/{id}/result", h.GetConsultationResult)
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).

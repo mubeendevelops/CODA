@@ -5,8 +5,7 @@ description = "PII redaction, thought construction, thought-graph assembly, MeSH
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "coda-proto",
-    "grpcio>=1.68,<2",
-    "grpcio-health-checking>=1.68,<2",
+    "coda-worker-sdk",
 ]
 
 [dependency-groups]
@@ -14,11 +13,13 @@ dev = [
     "ruff>=0.8,<1",
     "mypy>=1.13,<2",
     "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
     "types-grpcio>=1.0,<2",
 ]
 
 [tool.uv.sources]
 coda-proto = { workspace = true }
+coda-worker-sdk = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

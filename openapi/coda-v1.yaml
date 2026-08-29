@@ -236,8 +236,9 @@ paths:
       operationId: createJob
       summary: >
         Enqueue one pipeline run. Never blocks on processing — returns 202
-        once the job row is durably created; go-orchestrator (not yet
-        built, plan.md Phase 3) is the actual consumer.
+        once the job row is durably created. go-orchestrator picks it up
+        either from the job.submitted signal or from its own dispatch scan,
+        so the 202 holds whether or not Redis is reachable.
         admin | doctor.
       requestBody:
         content:
@@ -251,6 +252,28 @@ paths:
         "422":
           description: Audio has not been uploaded yet, the consultation was erased, or arm is not one of the known ablation arms.
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /consultations/{id}/cancel:
+    parameters:
+      - { $ref: "#/components/parameters/ConsultationId" }
+    post:
+      operationId: cancelConsultation
+      summary: >
+        Request cooperative cancellation (architecture.md §4.4). Sets
+        consultations.cancel_requested and audit-logs it; it does not itself
+        transition any state — go-orchestrator observes the flag, stops
+        dispatching, and moves every non-terminal job of this consultation
+        to `cancelled`, while the Python workers abort at their next
+        checkpoint. In-flight provider calls are not interrupted, so tokens
+        already spent stay accounted, and artifacts from completed stages
+        are retained as valid inputs for a later re-run.
+        Cancelling all of a consultation's ablation arms, since the flag is
+        consultation-scoped. Idempotent. admin | doctor.
+      responses:
+        "200": { description: Cancellation requested, content: { application/json: { schema: { $ref: "#/components/schemas/CancelConsultation" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /consultations/{id}/result:
     parameters:
@@ -484,6 +507,18 @@ components:
           type: array
           items: { $ref: "#/components/schemas/JobStage" }
 
+    CancelConsultation:
+      type: object
+      properties:
+        consultation_id: { type: string, format: uuid }
+        cancel_requested: { type: boolean }
+        state:
+          type: string
+          description: >
+            The consultation's state at the moment the flag was set. It is
+            not yet `cancelled` — go-orchestrator owns that transition
+            (ADR-0006) and applies it on its next cancellation sweep.
+
     JobStage:
       type: object
       properties:
@@ -496,6 +531,21 @@ components:
         metrics:
           type: object
           description: tokens_in/tokens_out/llm_calls/cache_hits/wall_ms (docs/architecture.md §2.2 StageMetrics).
+        percent_complete:
+          type: number
+          format: float
+          description: >
+            Worker-reported progress within this stage, from the
+            StageHeartbeat go-orchestrator lands on job_stages every 15s
+            (§2.4). Forced to 100 once the stage succeeds.
+        step:
+          type: string
+          description: Free-text label from the latest heartbeat, e.g. "diarizing".
+        heartbeat_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the latest heartbeat arrived. Null before the first one.
 
     ConsultationResult:
       type: object

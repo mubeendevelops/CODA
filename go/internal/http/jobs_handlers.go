@@ -236,6 +236,16 @@ type jobStageResponse struct {
 	FinishedAt *time.Time      `json:"finished_at,omitempty"`
 	ResultRef  string          `json:"result_ref,omitempty"`
 	Metrics    json.RawMessage `json:"metrics,omitempty"`
+
+	// Worker-reported progress within the stage, from the StageHeartbeat
+	// go-orchestrator lands on job_stages every 15s
+	// (docs/architecture.md §2.4). go-api reads it from Postgres and never
+	// touches the stage.progress stream — §1.2 forbids that, and
+	// claude_context.md decision #35 keeps this endpoint's read path
+	// unchanged.
+	PercentComplete float32    `json:"percent_complete"`
+	Step            string     `json:"step,omitempty"`
+	HeartbeatAt     *time.Time `json:"heartbeat_at,omitempty"`
 }
 
 type jobResponse struct {
@@ -325,7 +335,17 @@ func buildJobResponse(job *sqlc.Job, stages []*sqlc.JobStage) jobResponse {
 	succeeded := 0
 	resp.Stages = make([]jobStageResponse, 0, len(stages))
 	for _, s := range stages {
-		sr := jobStageResponse{Stage: s.Stage, Status: s.Status, Attempt: s.Attempt, Metrics: json.RawMessage(s.Metrics)}
+		sr := jobStageResponse{
+			Stage: s.Stage, Status: s.Status, Attempt: s.Attempt,
+			Metrics: json.RawMessage(s.Metrics), PercentComplete: s.PercentComplete,
+		}
+		if s.Step.Valid {
+			sr.Step = s.Step.String
+		}
+		if s.HeartbeatAt.Valid {
+			t := s.HeartbeatAt.Time
+			sr.HeartbeatAt = &t
+		}
 		if s.StartedAt.Valid {
 			t := s.StartedAt.Time
 			sr.StartedAt = &t
@@ -414,7 +434,15 @@ func (h *Handlers) JobEvents(w http.ResponseWriter, r *http.Request) {
 			return false
 		}
 		resp := buildJobResponse(current, stages)
+		// The signature includes each stage's heartbeat progress, not just
+		// the job-level state: without it a long stage (the GoT NLP arm
+		// runs up to 45 minutes) would emit one frame at dispatch and then
+		// nothing until it finished, which is exactly the case a progress
+		// stream exists for.
 		sig := fmt.Sprintf("%s|%s|%d|%d", current.State, resp.CurrentStage, current.Attempt, resp.ProgressPercent)
+		for _, st := range resp.Stages {
+			sig += fmt.Sprintf("|%s:%s:%.1f:%s", st.Stage, st.Status, st.PercentComplete, st.Step)
+		}
 		if sig == lastSignature {
 			return terminalJobStates[current.State]
 		}
@@ -589,4 +617,70 @@ func (h *Handlers) GetConsultationResult(w http.ResponseWriter, r *http.Request)
 	audit.MarkClinicalRead(r.Context())
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+type cancelConsultationResponse struct {
+	ConsultationID  uuid.UUID `json:"consultation_id"`
+	CancelRequested bool      `json:"cancel_requested"`
+	State           string    `json:"state"`
+}
+
+// CancelConsultation is go-api's half of cooperative cancellation
+// (docs/architecture.md §4.4). It sets consultations.cancel_requested and
+// writes an audit entry — and does nothing else.
+//
+// It deliberately does not transition any state: that is go-orchestrator's
+// exclusive authority (ADR-0006), and a second component moving a job to
+// CANCELLED is exactly the "two writers to one state machine" problem the
+// orchestrator-owned design exists to avoid. The orchestrator's
+// cancellation sweep observes the flag, stops dispatching, and moves the
+// job; the Python workers observe it at their own checkpoints and abort
+// (§4.4). In-flight provider calls are not interrupted, so tokens already
+// spent stay accounted.
+//
+// The flag lives on consultations rather than jobs, per §5.2's table (see
+// claude_context.md's note on §4.4's prose disagreeing with it), so
+// cancelling a consultation cancels every ablation arm running over it —
+// which is what a user clicking "cancel" means.
+//
+// Idempotent: cancelling an already-cancelled consultation is a 200, not a
+// conflict.
+func (h *Handlers) CancelConsultation(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid consultation id")
+		return
+	}
+	c, err := h.queries.GetConsultation(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
+		h.logger.ErrorContext(r.Context(), "cancel consultation: get", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !auth.RequireSameOrg(w, claims, c.OrgID) {
+		return
+	}
+
+	updated, err := h.queries.RequestConsultationCancel(r.Context(), c.ID)
+	if err != nil {
+		h.logger.ErrorContext(r.Context(), "cancel consultation: set flag", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	audit.SetResource(r.Context(), "consultation", c.ID.String())
+	audit.SetAction(r.Context(), "consultation.cancel")
+
+	writeJSON(w, http.StatusOK, cancelConsultationResponse{
+		ConsultationID: updated.ID, CancelRequested: updated.CancelRequested, State: updated.State,
+	})
 }

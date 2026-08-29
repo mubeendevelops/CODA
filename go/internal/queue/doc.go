@@ -1,12 +1,34 @@
-// Package queue owns the interface go-api enqueues pipeline jobs against.
-// The real implementation — Redis Streams XADD to stage.asr with
-// consumer-group delivery, XAUTOCLAIM stalled-message recovery, and
-// stage.dlq routing (docs/architecture.md §2) — is go-orchestrator's job,
-// not go-api's; go-orchestrator does not exist yet (plan.md Phase 3).
+// Package queue is the Redis Streams transport between go-orchestrator and
+// the Python ML workers (ADR-0002, docs/architecture.md §2).
 //
-// Until it does, Enqueuer is implemented by NoopEnqueuer: POST
-// /consultations/{id}/jobs creates the jobs row (the durable record of
-// "this needs processing") and calls Enqueue, which today only logs.
-// Swapping in a real Redis-backed Enqueuer later is a one-line change at
-// the call site in cmd/api/main.go — no handler code moves.
+// It owns five things and deliberately nothing else:
+//
+//  1. Publishing StageEnvelope to stage.asr / stage.nlp, guarded by
+//     producer-side idempotency keys (producer.go).
+//  2. Consuming a consumer group via XREADGROUP, acknowledging only after
+//     the handler reports durable persistence (consumer.go, §2.3).
+//  3. Reclaiming entries a dead consumer left pending, via XAUTOCLAIM past
+//     a per-stage visibility timeout (reclaim.go, §2.4).
+//  4. Routing over-attempt and FATAL messages to stage.dlq with the full
+//     per-attempt failure history (dlq.go, §2.5).
+//  5. The retry policy itself: exponential backoff with full jitter
+//     (backoff.go) and the per-stage max-attempt / timeout table
+//     (policy.go, §4.2).
+//
+// What it does *not* own is the decision to retry. The worker classifies a
+// failure (OK / RETRYABLE / FATAL / QUOTA_EXHAUSTED / CANCELLED); the
+// orchestrator in package pipeline decides what that means for the job.
+// This package only carries messages and supplies the numbers.
+//
+// Correctness rests on the database, not on this package. Delivery is
+// at-least-once, duplicates are expected and routine, and the guarantee
+// that a duplicate does no work is job_stages.idempotency_key UNIQUE
+// (ADR-0007) — not any check here. The producer-side dedupe guard in
+// PublishEnvelope is an optimisation that reduces duplicate *deliveries*;
+// losing it degrades to the behaviour the DB constraint already handles.
+//
+// go-api uses exactly one thing from this package: the Enqueuer interface,
+// satisfied in production by StreamEnqueuer, which rings a doorbell and
+// dispatches nothing (§1.2 forbids go-api from dispatching stages or
+// consuming streams).
 package queue

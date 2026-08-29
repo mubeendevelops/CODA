@@ -1,7 +1,11 @@
 # Shared Dockerfile for go-api and go-orchestrator. SERVICE selects the
 # cmd/ package to build; both binaries are cheap enough that duplicating the
 # build stage per-service isn't worth a second file.
-FROM golang:1.23-alpine AS build
+# 1.25 to match go.mod (claude_context.md §4: bumped from 1.23 when
+# testcontainers-go v0.44 was added for Phase 3's integration tests, which
+# sets 1.25 as its own `go` directive floor). Leaving this at 1.23 makes
+# `go mod download` fail under GOTOOLCHAIN=local.
+FROM golang:1.25-alpine AS build
 ARG SERVICE
 WORKDIR /src
 

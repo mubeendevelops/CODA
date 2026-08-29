@@ -142,18 +142,24 @@ type Job struct {
 }
 
 type JobStage struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	JobID          uuid.UUID          `db:"job_id" json:"job_id"`
-	Stage          string             `db:"stage" json:"stage"`
-	IdempotencyKey string             `db:"idempotency_key" json:"idempotency_key"`
-	Status         string             `db:"status" json:"status"`
-	Attempt        int32              `db:"attempt" json:"attempt"`
-	ResultRef      pgtype.Text        `db:"result_ref" json:"result_ref"`
-	Metrics        []byte             `db:"metrics" json:"metrics"`
-	StartedAt      pgtype.Timestamptz `db:"started_at" json:"started_at"`
-	FinishedAt     pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID              uuid.UUID          `db:"id" json:"id"`
+	JobID           uuid.UUID          `db:"job_id" json:"job_id"`
+	Stage           string             `db:"stage" json:"stage"`
+	IdempotencyKey  string             `db:"idempotency_key" json:"idempotency_key"`
+	Status          string             `db:"status" json:"status"`
+	Attempt         int32              `db:"attempt" json:"attempt"`
+	ResultRef       pgtype.Text        `db:"result_ref" json:"result_ref"`
+	Metrics         []byte             `db:"metrics" json:"metrics"`
+	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PercentComplete float32            `db:"percent_complete" json:"percent_complete"`
+	Step            pgtype.Text        `db:"step" json:"step"`
+	HeartbeatAt     pgtype.Timestamptz `db:"heartbeat_at" json:"heartbeat_at"`
+	DeadlineAt      pgtype.Timestamptz `db:"deadline_at" json:"deadline_at"`
+	LastError       []byte             `db:"last_error" json:"last_error"`
+	ErrorHistory    []byte             `db:"error_history" json:"error_history"`
 }
 
 type LlmCache struct {

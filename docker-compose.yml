@@ -29,6 +29,13 @@ services:
 
   redis:
     image: redis:7
+    # AOF on: ADR-0002 makes Redis persistence a correctness concern rather
+    # than a cache setting, because stage.* streams carry in-flight pipeline
+    # work. A restart that lost the PEL would lose every unacknowledged
+    # message — recoverable from Postgres by the orchestrator's dispatch
+    # scan, but only after a stage timeout, and at the cost of re-running
+    # work that was already in progress.
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
     volumes:
@@ -73,6 +80,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_ASYNQ_DB: ${REDIS_ASYNQ_DB:-1}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -111,6 +120,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_ASYNQ_DB: ${REDIS_ASYNQ_DB:-1}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -139,6 +150,7 @@ services:
         SERVICE: asr-service
     command: ["python", "-m", "asr_service.server"]
     environment:
+      ENV: ${ENV}
       LOG_LEVEL: ${LOG_LEVEL}
       GRPC_PORT: ${ASR_GRPC_PORT}
       HEALTH_PORT: ${ASR_HEALTH_PORT}
@@ -148,8 +160,11 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     depends_on:
       redis:
         condition: service_healthy
@@ -170,6 +185,7 @@ services:
         SERVICE: nlp-service
     command: ["python", "-m", "nlp_service.server"]
     environment:
+      ENV: ${ENV}
       LOG_LEVEL: ${LOG_LEVEL}
       GRPC_PORT: ${NLP_GRPC_PORT}
       HEALTH_PORT: ${NLP_HEALTH_PORT}
@@ -178,8 +194,11 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_USE_SSL: ${MINIO_USE_SSL}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -215,6 +234,30 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  # e2e: runs scripts/e2e_smoke.py inside the compose network so it resolves
+  # go-api/minio by their container hostnames — the same reason presigned
+  # MinIO URLs (signed against MINIO_ENDPOINT="minio:9000") can't be driven
+  # from the host: SigV4 signs the Host header, so no client-side rewrite
+  # after signing can work. `profiles: [tools]` keeps this out of a plain
+  # `docker compose up`; invoked via `make e2e` (docker compose run --rm e2e).
+  e2e:
+    image: python:3.11-slim
+    profiles: ["tools"]
+    working_dir: /scripts
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      E2E_API_BASE: http://go-api:${GO_API_HTTP_PORT}/v1
+      E2E_MINIO_REWRITE_TO: ""
+    entrypoint: ["python3", "e2e_smoke.py"]
+    depends_on:
+      go-api:
+        condition: service_healthy
+      asr-service:
+        condition: service_healthy
+      nlp-service:
+        condition: service_healthy
 
 volumes:
   redis-data:

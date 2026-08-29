@@ -16,7 +16,7 @@ const claimJobStage = `-- name: ClaimJobStage :one
 INSERT INTO job_stages (job_id, stage, idempotency_key, status, attempt)
 VALUES ($1, $2, $3, 'running', 1)
 ON CONFLICT (idempotency_key) DO NOTHING
-RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at
+RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history
 `
 
 type ClaimJobStageParams struct {
@@ -45,12 +45,184 @@ func (q *Queries) ClaimJobStage(ctx context.Context, arg ClaimJobStageParams) (*
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
+	)
+	return &i, err
+}
+
+const completeJobStage = `-- name: CompleteJobStage :one
+UPDATE job_stages
+SET status = 'succeeded', result_ref = $2, metrics = $3,
+    finished_at = now(), percent_complete = 100
+WHERE id = $1
+RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history
+`
+
+type CompleteJobStageParams struct {
+	ID        uuid.UUID   `db:"id" json:"id"`
+	ResultRef pgtype.Text `db:"result_ref" json:"result_ref"`
+	Metrics   []byte      `db:"metrics" json:"metrics"`
+}
+
+// Terminal success write for one stage. percent_complete is forced to 100
+// so a UI reading the last heartbeat doesn't show a succeeded stage at 60%.
+func (q *Queries) CompleteJobStage(ctx context.Context, arg CompleteJobStageParams) (*JobStage, error) {
+	row := q.db.QueryRow(ctx, completeJobStage, arg.ID, arg.ResultRef, arg.Metrics)
+	var i JobStage
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.Stage,
+		&i.IdempotencyKey,
+		&i.Status,
+		&i.Attempt,
+		&i.ResultRef,
+		&i.Metrics,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
+	)
+	return &i, err
+}
+
+const dispatchJobStage = `-- name: DispatchJobStage :one
+INSERT INTO job_stages (job_id, stage, idempotency_key, status, attempt, deadline_at, started_at)
+VALUES ($1, $2, $3, 'running', $4, $5, now())
+ON CONFLICT (idempotency_key) DO UPDATE
+SET status = 'running',
+    attempt = EXCLUDED.attempt,
+    deadline_at = EXCLUDED.deadline_at,
+    started_at = COALESCE(job_stages.started_at, now()),
+    finished_at = NULL,
+    heartbeat_at = NULL,
+    percent_complete = 0,
+    step = NULL
+WHERE job_stages.status <> 'succeeded'
+RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history
+`
+
+type DispatchJobStageParams struct {
+	JobID          uuid.UUID          `db:"job_id" json:"job_id"`
+	Stage          string             `db:"stage" json:"stage"`
+	IdempotencyKey string             `db:"idempotency_key" json:"idempotency_key"`
+	Attempt        int32              `db:"attempt" json:"attempt"`
+	DeadlineAt     pgtype.Timestamptz `db:"deadline_at" json:"deadline_at"`
+}
+
+// Dedupe protocol (§2.3) from the orchestrator's side, as one statement.
+//
+// A first dispatch inserts. A retry, a reaper re-dispatch, or a restarted
+// orchestrator re-running its scan hits the idempotency_key conflict and
+// updates the same row in place — attempt/deadline move, started_at and
+// error_history are preserved.
+//
+// The DO UPDATE ... WHERE guard is the load-bearing part: a row already
+// 'succeeded' matches no update, so the statement returns *no rows*. That
+// is the caller's signal to skip dispatch entirely and reuse the stored
+// result_ref (GetJobStageByIdempotencyKey), which is what stops an
+// expensive stage being re-paid for after a crash. It is enforced by the
+// UNIQUE constraint, not by orchestrator correctness (ADR-0007).
+func (q *Queries) DispatchJobStage(ctx context.Context, arg DispatchJobStageParams) (*JobStage, error) {
+	row := q.db.QueryRow(ctx, dispatchJobStage,
+		arg.JobID,
+		arg.Stage,
+		arg.IdempotencyKey,
+		arg.Attempt,
+		arg.DeadlineAt,
+	)
+	var i JobStage
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.Stage,
+		&i.IdempotencyKey,
+		&i.Status,
+		&i.Attempt,
+		&i.ResultRef,
+		&i.Metrics,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
+	)
+	return &i, err
+}
+
+const failJobStage = `-- name: FailJobStage :one
+UPDATE job_stages
+SET status = $1,
+    last_error = $2,
+    error_history = error_history || $3::jsonb,
+    metrics = $4,
+    finished_at = now()
+WHERE id = $5
+RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history
+`
+
+type FailJobStageParams struct {
+	Status       string    `db:"status" json:"status"`
+	LastError    []byte    `db:"last_error" json:"last_error"`
+	AttemptError []byte    `db:"attempt_error" json:"attempt_error"`
+	Metrics      []byte    `db:"metrics" json:"metrics"`
+	ID           uuid.UUID `db:"id" json:"id"`
+}
+
+// Records one failed attempt. error_history is *appended* to, never
+// replaced — it is the DeadLetter.attempts[] field (§2.5: "carries the
+// original envelope, every attempt's error"), and a DLQ message must be
+// reconstructible from Postgres after Redis has trimmed the stream.
+func (q *Queries) FailJobStage(ctx context.Context, arg FailJobStageParams) (*JobStage, error) {
+	row := q.db.QueryRow(ctx, failJobStage,
+		arg.Status,
+		arg.LastError,
+		arg.AttemptError,
+		arg.Metrics,
+		arg.ID,
+	)
+	var i JobStage
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.Stage,
+		&i.IdempotencyKey,
+		&i.Status,
+		&i.Attempt,
+		&i.ResultRef,
+		&i.Metrics,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
 	)
 	return &i, err
 }
 
 const getJobStageByIdempotencyKey = `-- name: GetJobStageByIdempotencyKey :one
-SELECT id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at FROM job_stages WHERE idempotency_key = $1
+SELECT id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history FROM job_stages WHERE idempotency_key = $1
 `
 
 // Dedupe protocol step 1 (§2.3): check for an already-succeeded row before
@@ -71,6 +243,53 @@ func (q *Queries) GetJobStageByIdempotencyKey(ctx context.Context, idempotencyKe
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
+	)
+	return &i, err
+}
+
+const getJobStageByJobAndStage = `-- name: GetJobStageByJobAndStage :one
+SELECT id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history FROM job_stages
+WHERE job_id = $1 AND stage = $2
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type GetJobStageByJobAndStageParams struct {
+	JobID uuid.UUID `db:"job_id" json:"job_id"`
+	Stage string    `db:"stage" json:"stage"`
+}
+
+// Resolve a result/heartbeat message to its row when the sender echoed a
+// stale idempotency_key (a reclaimed message predating an input change).
+// Newest first: a stage re-run under a changed input has more than one row.
+func (q *Queries) GetJobStageByJobAndStage(ctx context.Context, arg GetJobStageByJobAndStageParams) (*JobStage, error) {
+	row := q.db.QueryRow(ctx, getJobStageByJobAndStage, arg.JobID, arg.Stage)
+	var i JobStage
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.Stage,
+		&i.IdempotencyKey,
+		&i.Status,
+		&i.Attempt,
+		&i.ResultRef,
+		&i.Metrics,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
 	)
 	return &i, err
 }
@@ -79,7 +298,7 @@ const incrementJobStageAttempt = `-- name: IncrementJobStageAttempt :one
 UPDATE job_stages
 SET attempt = attempt + 1, status = 'running', started_at = COALESCE(started_at, now())
 WHERE id = $1
-RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at
+RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history
 `
 
 func (q *Queries) IncrementJobStageAttempt(ctx context.Context, id uuid.UUID) (*JobStage, error) {
@@ -98,12 +317,18 @@ func (q *Queries) IncrementJobStageAttempt(ctx context.Context, id uuid.UUID) (*
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
 	)
 	return &i, err
 }
 
 const listJobStagesByJob = `-- name: ListJobStagesByJob :many
-SELECT id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at FROM job_stages WHERE job_id = $1 ORDER BY started_at NULLS LAST
+SELECT id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history FROM job_stages WHERE job_id = $1 ORDER BY started_at NULLS LAST
 `
 
 // Query pattern: fetch a job with its stages — step 2 of 2.
@@ -129,6 +354,12 @@ func (q *Queries) ListJobStagesByJob(ctx context.Context, jobID uuid.UUID) ([]*J
 			&i.FinishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.PercentComplete,
+			&i.Step,
+			&i.HeartbeatAt,
+			&i.DeadlineAt,
+			&i.LastError,
+			&i.ErrorHistory,
 		); err != nil {
 			return nil, err
 		}
@@ -140,11 +371,108 @@ func (q *Queries) ListJobStagesByJob(ctx context.Context, jobID uuid.UUID) ([]*J
 	return items, nil
 }
 
+const listStalledJobStages = `-- name: ListStalledJobStages :many
+SELECT id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history FROM job_stages
+WHERE status = 'running'
+  AND (
+        (deadline_at IS NOT NULL AND deadline_at <= now())
+     OR (heartbeat_at IS NOT NULL
+         AND heartbeat_at < now() - make_interval(secs => $2::double precision))
+     OR (heartbeat_at IS NULL AND started_at IS NOT NULL
+         AND started_at < now() - make_interval(secs => $3::double precision))
+  )
+ORDER BY started_at
+LIMIT $1
+`
+
+type ListStalledJobStagesParams struct {
+	Limit               int32   `db:"limit" json:"limit"`
+	HeartbeatGapSeconds float64 `db:"heartbeat_gap_seconds" json:"heartbeat_gap_seconds"`
+	StartupGraceSeconds float64 `db:"startup_grace_seconds" json:"startup_grace_seconds"`
+}
+
+// §2.4's stall detection, the Postgres half. XAUTOCLAIM finds messages
+// idle in the PEL; this finds stages whose *worker* went quiet — past its
+// soft deadline (§4.2), or heartbeat-silent for longer than the allowed
+// gap even while still inside the visibility window.
+func (q *Queries) ListStalledJobStages(ctx context.Context, arg ListStalledJobStagesParams) ([]*JobStage, error) {
+	rows, err := q.db.Query(ctx, listStalledJobStages, arg.Limit, arg.HeartbeatGapSeconds, arg.StartupGraceSeconds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*JobStage
+	for rows.Next() {
+		var i JobStage
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobID,
+			&i.Stage,
+			&i.IdempotencyKey,
+			&i.Status,
+			&i.Attempt,
+			&i.ResultRef,
+			&i.Metrics,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.PercentComplete,
+			&i.Step,
+			&i.HeartbeatAt,
+			&i.DeadlineAt,
+			&i.LastError,
+			&i.ErrorHistory,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordJobStageHeartbeat = `-- name: RecordJobStageHeartbeat :execrows
+UPDATE job_stages
+SET percent_complete = $3, step = $4, heartbeat_at = now()
+WHERE job_id = $1 AND stage = $2 AND status = 'running'
+`
+
+type RecordJobStageHeartbeatParams struct {
+	JobID           uuid.UUID   `db:"job_id" json:"job_id"`
+	Stage           string      `db:"stage" json:"stage"`
+	PercentComplete float32     `db:"percent_complete" json:"percent_complete"`
+	Step            pgtype.Text `db:"step" json:"step"`
+}
+
+// Lands one StageHeartbeat from stage.progress (§2.4). The orchestrator is
+// the only sanctioned consumer of stage.* streams (§1.2), so this row is
+// how progress reaches go-api's SSE endpoint — it polls Postgres and never
+// touches Redis (claude_context.md decision #35).
+//
+// Only 'running' rows are updated: a heartbeat that arrives after the
+// result (reordering is legal on separate streams) must not resurrect a
+// finished stage or walk percent_complete back down from 100.
+func (q *Queries) RecordJobStageHeartbeat(ctx context.Context, arg RecordJobStageHeartbeatParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordJobStageHeartbeat,
+		arg.JobID,
+		arg.Stage,
+		arg.PercentComplete,
+		arg.Step,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateJobStageResult = `-- name: UpdateJobStageResult :one
 UPDATE job_stages
 SET status = $2, result_ref = $3, metrics = $4, finished_at = now()
 WHERE id = $1
-RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at
+RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history
 `
 
 type UpdateJobStageResultParams struct {
@@ -175,6 +503,12 @@ func (q *Queries) UpdateJobStageResult(ctx context.Context, arg UpdateJobStageRe
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PercentComplete,
+		&i.Step,
+		&i.HeartbeatAt,
+		&i.DeadlineAt,
+		&i.LastError,
+		&i.ErrorHistory,
 	)
 	return &i, err
 }

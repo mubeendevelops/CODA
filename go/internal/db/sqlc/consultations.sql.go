@@ -207,6 +207,89 @@ func (q *Queries) ListConsultationsByOrgAndState(ctx context.Context, arg ListCo
 	return items, nil
 }
 
+const listErasedConsultations = `-- name: ListErasedConsultations :many
+SELECT id, org_id, owner_user_id, consent_record_id, consent_obtained, consent_method, consent_recorded_at, state, language, source_audio_uri, audio_sha256, duration_sec, cancel_requested, erased_at, created_at, updated_at FROM consultations
+WHERE erased_at IS NOT NULL
+ORDER BY erased_at DESC
+LIMIT $1
+`
+
+// Retention sweep input: consultations whose DPDP erasure (§7.2) set the
+// tombstone. The sweep re-deletes their MinIO prefix, so an erasure that
+// crashed part-way through object deletion converges instead of leaving
+// orphaned audio behind.
+func (q *Queries) ListErasedConsultations(ctx context.Context, limit int32) ([]*Consultation, error) {
+	rows, err := q.db.Query(ctx, listErasedConsultations, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Consultation
+	for rows.Next() {
+		var i Consultation
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.OwnerUserID,
+			&i.ConsentRecordID,
+			&i.ConsentObtained,
+			&i.ConsentMethod,
+			&i.ConsentRecordedAt,
+			&i.State,
+			&i.Language,
+			&i.SourceAudioUri,
+			&i.AudioSha256,
+			&i.DurationSec,
+			&i.CancelRequested,
+			&i.ErasedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const requestConsultationCancel = `-- name: RequestConsultationCancel :one
+UPDATE consultations SET cancel_requested = true WHERE id = $1 RETURNING id, org_id, owner_user_id, consent_record_id, consent_obtained, consent_method, consent_recorded_at, state, language, source_audio_uri, audio_sha256, duration_sec, cancel_requested, erased_at, created_at, updated_at
+`
+
+// Cancellation is cooperative and consultation-scoped (§4.4 + §5.2). The
+// flag lives on consultations, not jobs: claude_context.md records that
+// §4.4's prose ("go-api sets jobs.cancel_requested") disagrees with the
+// §5.2 table the schema was built from, resolved in favour of §5.2. A
+// consultation's jobs are its ablation arms, so cancelling the
+// consultation cancels every arm — which is what a user clicking "cancel"
+// means.
+func (q *Queries) RequestConsultationCancel(ctx context.Context, id uuid.UUID) (*Consultation, error) {
+	row := q.db.QueryRow(ctx, requestConsultationCancel, id)
+	var i Consultation
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.OwnerUserID,
+		&i.ConsentRecordID,
+		&i.ConsentObtained,
+		&i.ConsentMethod,
+		&i.ConsentRecordedAt,
+		&i.State,
+		&i.Language,
+		&i.SourceAudioUri,
+		&i.AudioSha256,
+		&i.DurationSec,
+		&i.CancelRequested,
+		&i.ErasedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
 const updateConsultationAudio = `-- name: UpdateConsultationAudio :one
 UPDATE consultations
 SET source_audio_uri = $2, audio_sha256 = $3, duration_sec = $4

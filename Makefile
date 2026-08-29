@@ -42,19 +42,24 @@ test-go:
 	cd go && go test ./...
 
 test-python:
+	cd python && uv run --project shared pytest -q shared/tests
 	cd python && uv run --project asr-service pytest -q asr-service/tests
 	cd python && uv run --project nlp-service pytest -q nlp-service/tests
 
 test-frontend:
 	cd frontend && npm run test -- --run
 
-## test-integration: run go-api's integration tests against a real,
-## disposable Postgres container (testcontainers-go) — auth, RBAC, and
-## org-scoping end to end over real HTTP. Excluded from `make test` (the
-## `integration` build tag) since it needs Docker and takes longer; needs
-## the `migrate` CLI on PATH the same way `make migrate-test` does.
+## test-integration: run the integration suites against real, disposable
+## containers (testcontainers-go) — go-api over real HTTP against Postgres +
+## MinIO, and the queue/orchestrator against a real Redis + Postgres
+## (docs/architecture.md §2 and §4: at-least-once delivery, XAUTOCLAIM
+## recovery and transactional transitions are properties of Redis and
+## Postgres, so a mock would only assert what the author assumed).
+## Excluded from `make test` (the `integration` build tag) since it needs
+## Docker and takes longer; needs the `migrate` CLI on PATH the same way
+## `make migrate-test` does.
 test-integration:
-	cd go && go test -tags=integration ./internal/http/...
+	cd go && go test -tags=integration -timeout 25m ./internal/http/... ./internal/queue/... ./internal/pipeline/...
 
 ## lint: lint every service.
 lint: lint-go lint-python lint-frontend
@@ -63,8 +68,10 @@ lint-go:
 	cd go && golangci-lint run ./...
 
 lint-python:
+	cd python && uv run --project shared ruff check shared/src shared/tests
 	cd python && uv run --project asr-service ruff check asr-service/src asr-service/tests
 	cd python && uv run --project nlp-service ruff check nlp-service/src nlp-service/tests
+	cd python && uv run --project shared mypy shared/src
 	cd python && uv run --project asr-service mypy asr-service/src
 	cd python && uv run --project nlp-service mypy nlp-service/src
 
@@ -98,9 +105,15 @@ migrate-test:
 seed:
 	cd go && POSTGRES_HOST=localhost POSTGRES_PORT=$(POSTGRES_HOST_PORT) go run ./cmd/seed
 
-## e2e: end-to-end pipeline test against a running stack (Phase 1+ — nothing to test yet).
+## e2e: walking-skeleton smoke test against a running `docker compose up` stack.
+## Proves the plumbing (upload -> job -> echo workers -> awaiting_review)
+## independently of model behaviour — no real ASR/NLP runs. Real-model
+## acceptance is Phase 1's job once the echo handlers are replaced. Runs
+## inside the compose network (docker compose run) rather than on the host:
+## presigned MinIO URLs are signed against the container hostname, and a
+## SigV4 signature can't be rewritten to a host-reachable one after signing.
 e2e:
-	@echo "no e2e path yet — implemented in Phase 1 (vertical slice)"
+	docker compose run --rm e2e
 
 ## openapi-lint: sanity-check openapi/coda-v1.yaml parses as YAML with the
 ## expected top-level shape. Not a full OpenAPI schema validator — the spec

@@ -56,6 +56,30 @@ func (q *Queries) CreateArtifact(ctx context.Context, arg CreateArtifactParams) 
 	return &i, err
 }
 
+const getArtifactByURI = `-- name: GetArtifactByURI :one
+SELECT id, consultation_id, stage, run_config_id, kind, uri, sha256, bytes, content_type, created_at FROM artifacts WHERE uri = $1
+`
+
+// Orphan detection for the retention sweep: a MinIO object with no
+// artifacts row is unreferenced.
+func (q *Queries) GetArtifactByURI(ctx context.Context, uri string) (*Artifact, error) {
+	row := q.db.QueryRow(ctx, getArtifactByURI, uri)
+	var i Artifact
+	err := row.Scan(
+		&i.ID,
+		&i.ConsultationID,
+		&i.Stage,
+		&i.RunConfigID,
+		&i.Kind,
+		&i.Uri,
+		&i.Sha256,
+		&i.Bytes,
+		&i.ContentType,
+		&i.CreatedAt,
+	)
+	return &i, err
+}
+
 const listArtifactsByConsultation = `-- name: ListArtifactsByConsultation :many
 SELECT id, consultation_id, stage, run_config_id, kind, uri, sha256, bytes, content_type, created_at
 FROM artifacts
@@ -100,4 +124,54 @@ func (q *Queries) ListArtifactsByConsultation(ctx context.Context, arg ListArtif
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertArtifact = `-- name: UpsertArtifact :one
+INSERT INTO artifacts (consultation_id, stage, run_config_id, kind, uri, sha256, bytes, content_type)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (uri) DO UPDATE SET uri = EXCLUDED.uri
+RETURNING id, consultation_id, stage, run_config_id, kind, uri, sha256, bytes, content_type, created_at
+`
+
+type UpsertArtifactParams struct {
+	ConsultationID uuid.UUID `db:"consultation_id" json:"consultation_id"`
+	Stage          string    `db:"stage" json:"stage"`
+	RunConfigID    uuid.UUID `db:"run_config_id" json:"run_config_id"`
+	Kind           string    `db:"kind" json:"kind"`
+	Uri            string    `db:"uri" json:"uri"`
+	Sha256         string    `db:"sha256" json:"sha256"`
+	Bytes          int64     `db:"bytes" json:"bytes"`
+	ContentType    string    `db:"content_type" json:"content_type"`
+}
+
+// Artifact keys are immutable (§3.3), so a conflict on uri means a
+// *duplicate delivery* of the same stage result, not a changed artifact —
+// at-least-once delivery (ADR-0007) makes that routine. DO UPDATE with a
+// no-op assignment (rather than DO NOTHING) so the existing row is still
+// RETURNINGed and the caller has one code path.
+func (q *Queries) UpsertArtifact(ctx context.Context, arg UpsertArtifactParams) (*Artifact, error) {
+	row := q.db.QueryRow(ctx, upsertArtifact,
+		arg.ConsultationID,
+		arg.Stage,
+		arg.RunConfigID,
+		arg.Kind,
+		arg.Uri,
+		arg.Sha256,
+		arg.Bytes,
+		arg.ContentType,
+	)
+	var i Artifact
+	err := row.Scan(
+		&i.ID,
+		&i.ConsultationID,
+		&i.Stage,
+		&i.RunConfigID,
+		&i.Kind,
+		&i.Uri,
+		&i.Sha256,
+		&i.Bytes,
+		&i.ContentType,
+		&i.CreatedAt,
+	)
+	return &i, err
 }

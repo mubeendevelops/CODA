@@ -55,3 +55,23 @@ RETURNING *;
 -- The caller must capture what it needs for the audit `before` snapshot
 -- and delete MinIO objects *before* calling this — the row is gone after.
 DELETE FROM consultations WHERE id = $1;
+
+-- name: RequestConsultationCancel :one
+-- Cancellation is cooperative and consultation-scoped (§4.4 + §5.2). The
+-- flag lives on consultations, not jobs: claude_context.md records that
+-- §4.4's prose ("go-api sets jobs.cancel_requested") disagrees with the
+-- §5.2 table the schema was built from, resolved in favour of §5.2. A
+-- consultation's jobs are its ablation arms, so cancelling the
+-- consultation cancels every arm — which is what a user clicking "cancel"
+-- means.
+UPDATE consultations SET cancel_requested = true WHERE id = $1 RETURNING *;
+
+-- name: ListErasedConsultations :many
+-- Retention sweep input: consultations whose DPDP erasure (§7.2) set the
+-- tombstone. The sweep re-deletes their MinIO prefix, so an erasure that
+-- crashed part-way through object deletion converges instead of leaving
+-- orphaned audio behind.
+SELECT * FROM consultations
+WHERE erased_at IS NOT NULL
+ORDER BY erased_at DESC
+LIMIT $1;

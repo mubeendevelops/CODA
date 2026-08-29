@@ -12,6 +12,37 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countJobsByState = `-- name: CountJobsByState :many
+SELECT state, count(*)::bigint AS count FROM jobs GROUP BY state
+`
+
+type CountJobsByStateRow struct {
+	State string `db:"state" json:"state"`
+	Count int64  `db:"count" json:"count"`
+}
+
+// Feeds the orchestrator's Prometheus gauges (§8: "attempt counts, DLQ
+// depth, quota-park events").
+func (q *Queries) CountJobsByState(ctx context.Context) ([]*CountJobsByStateRow, error) {
+	rows, err := q.db.Query(ctx, countJobsByState)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*CountJobsByStateRow
+	for rows.Next() {
+		var i CountJobsByStateRow
+		if err := rows.Scan(&i.State, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createJob = `-- name: CreateJob :one
 INSERT INTO jobs (consultation_id, run_config_id, trace_id, eval_run_id)
 VALUES ($1, $2, $3, $4)
@@ -102,6 +133,130 @@ func (q *Queries) IncrementJobAttempt(ctx context.Context, id uuid.UUID) (*Job, 
 	return &i, err
 }
 
+const listDispatchableJobs = `-- name: ListDispatchableJobs :many
+SELECT j.id, j.consultation_id, j.run_config_id, j.state, j.current_stage, j.attempt, j.resume_after, j.error, j.trace_id, j.eval_run_id, j.created_at, j.updated_at
+FROM jobs j
+JOIN consultations c ON c.id = j.consultation_id
+JOIN consent_records cr ON cr.id = c.consent_record_id
+WHERE j.state = ANY($2::text[])
+  AND (j.resume_after IS NULL OR j.resume_after <= now())
+  AND c.cancel_requested = false
+  AND c.erased_at IS NULL
+  AND cr.revoked_at IS NULL
+ORDER BY j.updated_at
+LIMIT $1
+`
+
+type ListDispatchableJobsParams struct {
+	Limit  int32    `db:"limit" json:"limit"`
+	States []string `db:"states" json:"states"`
+}
+
+// The orchestrator's dispatch scan, and the reason a crashed orchestrator
+// resumes on restart without anyone re-submitting anything: a job parked
+// in a *_queued state is picked up here whether it got there from
+// POST /jobs, a retry backoff, a quota park, or an orchestrator that died
+// between persisting the transition and XADDing the envelope.
+//
+// Consent is re-checked at every dispatch, not only at upload (§7.2), so
+// a mid-pipeline revocation halts processing; the same join drops
+// cancel-requested and erased consultations.
+func (q *Queries) ListDispatchableJobs(ctx context.Context, arg ListDispatchableJobsParams) ([]*Job, error) {
+	rows, err := q.db.Query(ctx, listDispatchableJobs, arg.Limit, arg.States)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Job
+	for rows.Next() {
+		var i Job
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConsultationID,
+			&i.RunConfigID,
+			&i.State,
+			&i.CurrentStage,
+			&i.Attempt,
+			&i.ResumeAfter,
+			&i.Error,
+			&i.TraceID,
+			&i.EvalRunID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHaltedJobs = `-- name: ListHaltedJobs :many
+SELECT j.id, j.consultation_id, j.run_config_id, j.state, j.current_stage, j.attempt, j.resume_after, j.error, j.trace_id, j.eval_run_id, j.created_at, j.updated_at
+FROM jobs j
+JOIN consultations c ON c.id = j.consultation_id
+JOIN consent_records cr ON cr.id = c.consent_record_id
+WHERE (c.cancel_requested = true OR c.erased_at IS NOT NULL OR cr.revoked_at IS NOT NULL)
+  AND NOT (j.state = ANY($2::text[]))
+ORDER BY j.updated_at
+LIMIT $1
+`
+
+type ListHaltedJobsParams struct {
+	Limit          int32    `db:"limit" json:"limit"`
+	TerminalStates []string `db:"terminal_states" json:"terminal_states"`
+}
+
+// Every reason a job must stop, in one scan.
+//
+// Cancellation is cooperative (§4.4): go-api flips
+// consultations.cancel_requested, and the orchestrator observes it here.
+// Erasure and consent revocation are folded in deliberately: those two
+// conditions also *exclude* a job from ListDispatchableJobs, so if this
+// scan only looked at cancel_requested, a consultation whose consent was
+// withdrawn mid-pipeline would silently stop being dispatched and then sit
+// in a non-terminal state forever — invisible to every operator query that
+// asks "what is still running". §7.2 requires processing to halt, which
+// means reaching a terminal state, not merely ceasing to advance.
+//
+// Non-terminal jobs only — a halt arriving after EXPORTED is a no-op, not a
+// state regression.
+func (q *Queries) ListHaltedJobs(ctx context.Context, arg ListHaltedJobsParams) ([]*Job, error) {
+	rows, err := q.db.Query(ctx, listHaltedJobs, arg.Limit, arg.TerminalStates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Job
+	for rows.Next() {
+		var i Job
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConsultationID,
+			&i.RunConfigID,
+			&i.State,
+			&i.CurrentStage,
+			&i.Attempt,
+			&i.ResumeAfter,
+			&i.Error,
+			&i.TraceID,
+			&i.EvalRunID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJobsAwaitingResume = `-- name: ListJobsAwaitingResume :many
 SELECT id, consultation_id, run_config_id, state, current_stage, attempt, resume_after, error, trace_id, eval_run_id, created_at, updated_at FROM jobs
 WHERE state = $1 AND resume_after IS NOT NULL AND resume_after <= now()
@@ -178,6 +333,137 @@ func (q *Queries) ListJobsByConsultation(ctx context.Context, consultationID uui
 		return nil, err
 	}
 	return items, nil
+}
+
+const listStaleJobs = `-- name: ListStaleJobs :many
+SELECT id, consultation_id, run_config_id, state, current_stage, attempt, resume_after, error, trace_id, eval_run_id, created_at, updated_at FROM jobs
+WHERE state = ANY($2::text[])
+  AND updated_at < now() - make_interval(secs => $3::double precision)
+ORDER BY updated_at
+LIMIT $1
+`
+
+type ListStaleJobsParams struct {
+	Limit        int32    `db:"limit" json:"limit"`
+	States       []string `db:"states" json:"states"`
+	StaleSeconds float64  `db:"stale_seconds" json:"stale_seconds"`
+}
+
+// Stale-job reaping (the Asynq periodic job): a job sitting in a
+// *_running state with nothing having touched it for longer than the
+// stage's visibility timeout. Distinct from ListStalledJobStages, which
+// finds the stalled *message*; this finds a job whose stage row went
+// missing or whose dispatch never landed at all.
+func (q *Queries) ListStaleJobs(ctx context.Context, arg ListStaleJobsParams) ([]*Job, error) {
+	rows, err := q.db.Query(ctx, listStaleJobs, arg.Limit, arg.States, arg.StaleSeconds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Job
+	for rows.Next() {
+		var i Job
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConsultationID,
+			&i.RunConfigID,
+			&i.State,
+			&i.CurrentStage,
+			&i.Attempt,
+			&i.ResumeAfter,
+			&i.Error,
+			&i.TraceID,
+			&i.EvalRunID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockJob = `-- name: LockJob :one
+SELECT id, consultation_id, run_config_id, state, current_stage, attempt, resume_after, error, trace_id, eval_run_id, created_at, updated_at FROM jobs WHERE id = $1 FOR UPDATE
+`
+
+// Orchestrator transition step 1 (docs/architecture.md §4.1: "all
+// transitions append to audit_log inside the same transaction that
+// performs the transition"). Row-locks the job for the duration of the
+// transaction so two orchestrator replicas — or a redelivered result
+// racing a reaper re-dispatch — cannot interleave a read-modify-write on
+// the same job.
+func (q *Queries) LockJob(ctx context.Context, id uuid.UUID) (*Job, error) {
+	row := q.db.QueryRow(ctx, lockJob, id)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.ConsultationID,
+		&i.RunConfigID,
+		&i.State,
+		&i.CurrentStage,
+		&i.Attempt,
+		&i.ResumeAfter,
+		&i.Error,
+		&i.TraceID,
+		&i.EvalRunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
+}
+
+const transitionJob = `-- name: TransitionJob :one
+UPDATE jobs
+SET state = $2, current_stage = $3, attempt = $4, resume_after = $5, error = $6
+WHERE id = $1
+RETURNING id, consultation_id, run_config_id, state, current_stage, attempt, resume_after, error, trace_id, eval_run_id, created_at, updated_at
+`
+
+type TransitionJobParams struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	State        string             `db:"state" json:"state"`
+	CurrentStage *string            `db:"current_stage" json:"current_stage"`
+	Attempt      int32              `db:"attempt" json:"attempt"`
+	ResumeAfter  pgtype.Timestamptz `db:"resume_after" json:"resume_after"`
+	Error        []byte             `db:"error" json:"error"`
+}
+
+// The single write every state transition goes through. state,
+// current_stage, attempt, resume_after and error move together because
+// §2.5's rules relate them: a retry bumps attempt, a quota park sets
+// resume_after and leaves attempt alone, and a terminal failure sets
+// error. Splitting them across statements would let a crash land the job
+// in a combination the state machine never intends.
+func (q *Queries) TransitionJob(ctx context.Context, arg TransitionJobParams) (*Job, error) {
+	row := q.db.QueryRow(ctx, transitionJob,
+		arg.ID,
+		arg.State,
+		arg.CurrentStage,
+		arg.Attempt,
+		arg.ResumeAfter,
+		arg.Error,
+	)
+	var i Job
+	err := row.Scan(
+		&i.ID,
+		&i.ConsultationID,
+		&i.RunConfigID,
+		&i.State,
+		&i.CurrentStage,
+		&i.Attempt,
+		&i.ResumeAfter,
+		&i.Error,
+		&i.TraceID,
+		&i.EvalRunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return &i, err
 }
 
 const updateJobState = `-- name: UpdateJobState :one

@@ -6,8 +6,10 @@ Companion documents: `claude_context.md` (project context, decisions), `plan.md`
 `docs/adr/` (one ADR per major decision). This document is normative: where it disagrees with the
 blueprint, this document wins.
 
-Status: specification complete, implementation not started.
-Last updated: 2026-08-27.
+Status: specification complete. Implementation: §2 (transport), §4 (state machine) and §5 are
+built (`go/internal/queue`, `go/internal/pipeline`, `go/internal/tasks`); §6 and the Python worker
+side of §2 are not.
+Last updated: 2026-08-29.
 
 ---
 
@@ -139,6 +141,19 @@ orchestrator consumes on its own group. Poison messages route to `stage.dlq`.
 | `stage.progress` | asr-service, nlp-service | `orchestrator` | `StageHeartbeat` |
 | `stage.dlq` | go-orchestrator | manual / operator | `DeadLetter` |
 
+One control stream sits outside this table because it carries no clinical payload and is not a
+`stage.*` stream:
+
+| Stream | Producer | Consumer group | Payload |
+|---|---|---|---|
+| `job.submitted` | go-api | `orchestrator` | `{job_id, consultation_id, run_config_id}` |
+
+`job.submitted` is a doorbell, not a dispatch: it lets a newly created `jobs` row start processing in
+milliseconds instead of waiting for the orchestrator's next scan. It is deliberately **not**
+load-bearing — the `jobs` row is the durable record and `ListDispatchableJobs` finds it regardless, so
+a lost doorbell costs latency, never work. This is also why producing to it does not breach §1.2:
+go-api dispatches no stage and consumes no stream.
+
 Rationale and rejected alternatives: **ADR-0002**. gRPC scope: **ADR-0003**.
 
 ### 2.2 Message envelope
@@ -219,7 +234,10 @@ Workers can die mid-stage. Pending entries then sit in the consumer group's PEL 
 reclaimed.
 
 - Every worker emits a `StageHeartbeat` to `stage.progress` every **15 s** while working, carrying
-  `job_id`, `stage`, `attempt`, `percent_complete`, and a free-text `step` label.
+  `job_id`, `stage`, `attempt`, `percent_complete`, and a free-text `step` label. The orchestrator —
+  the only sanctioned consumer of a `stage.*` stream (§1.2) — lands each one on
+  `job_stages.percent_complete` / `.step` / `.heartbeat_at` (migration 000031), which is how progress
+  reaches `GET /v1/jobs/{id}` and its SSE variant without go-api ever touching Redis.
 - The orchestrator runs a reaper every **30 s**. It issues `XAUTOCLAIM` against each stream for
   entries idle longer than the stage's **visibility timeout**, then re-dispatches with `attempt + 1`.
 - Visibility timeout is per-stage, set to roughly 2× observed p95 (§4.2). A job whose heartbeats
@@ -406,6 +424,17 @@ Terminal off-ramps from any non-terminal state:
    ──► CANCELLED        (operator or owner cancellation)
 ```
 
+`FAILED` and `DEAD_LETTERED` are separated by what an operator can *do* about each.
+`DEAD_LETTERED` means a `DeadLetter` carrying the full envelope and failure history reached
+`stage.dlq`, so §2.5's replay is available. `FAILED` means a terminal condition with no replayable
+message — an unloadable run config, an unroutable stage, or a failure to publish the `DeadLetter`
+itself. A `DEAD_LETTERED` job can be recovered from Redis; a `FAILED` one has to be re-submitted.
+
+`CANCELLED` also absorbs consent revocation and DPDP erasure (§7.2), which §4.1 gives no state of
+their own: withdrawing consent is the data subject exercising a right — an owner cancellation in this
+section's own terms — not a system failure. The distinguishing reason (`cancel_requested`,
+`consent_revoked`, `consultation_erased`) is recorded in `jobs.error`.
+
 **Transition rules**
 
 - `CREATED → CONSENT_RECORDED` requires a `consent_records` row. A consultation cannot leave `CREATED`
@@ -434,6 +463,18 @@ The GoT window is wide because free-tier TPM throttling (8–12K tokens/min) dom
 before any model latency. Timeouts are sized against throttle, not compute.
 
 A worker past its `deadline` aborts and returns `RETRYABLE / DEADLINE_EXCEEDED` rather than running on.
+The orchestrator enforces the same bound from its side, since a worker that *died* cannot report its
+own death: a `running` stage past `deadline_at`, or heartbeat-silent for more than 90 s, is recorded
+as `RETRYABLE / DEADLINE_EXCEEDED` (or `HEARTBEAT_LOST`) and re-enters the normal retry/DLQ policy.
+
+**Attempts are counted per stage, not per job.** The ceilings above are per-stage, so a job that spent
+two ASR attempts must still get redaction's full two; the counter lives on `job_stages.attempt`, keyed
+by idempotency key, and `jobs.attempt` mirrors whichever stage is current.
+
+**Retry and quota parking return a job to the state its stage is dispatched from.** For `asr` and
+`nlp` that is the `*_QUEUED` state §2.5 names. `redact` has no `REDACT_QUEUED` state anywhere in
+§4.1, so it parks in `ASR_DONE` — the state redaction is dispatched from — which is what makes the
+dispatch scan pick it up again when `resume_after` elapses.
 
 ### 4.3 Partial failure and resume
 
@@ -453,7 +494,11 @@ acceptance criterion.
 
 ### 4.4 Cancellation
 
-Cancellation is cooperative. `go-api` sets `jobs.cancel_requested = true` and writes an audit entry.
+Cancellation is cooperative. `go-api` sets `consultations.cancel_requested = true`
+(`POST /v1/consultations/{id}/cancel`) and writes an audit entry. The flag is on `consultations`, not
+`jobs`, matching the §5.2 table the schema was built from — an earlier draft of this paragraph said
+`jobs.cancel_requested`, which no table ever had. Since a consultation's jobs are its ablation arms,
+cancelling the consultation cancels every arm, which is what a user clicking "cancel" means.
 Workers check the flag at every checkpoint boundary and on each heartbeat tick; on observing it they
 abort, emit `CANCELLED`, and `XACK`. The orchestrator moves the consultation to `CANCELLED` and stops
 dispatching. In-flight provider calls are not interrupted — already-spent tokens are still accounted.
@@ -677,12 +722,15 @@ identity exists to key the middleware off of (`go/internal/http/auth_handlers.go
 append-only (trigger-enforced; UPDATE/DELETE revoked from the application role). Each entry carries
 `trace_id`, joining the audit trail to the distributed trace for any given consultation.
 
-**A stated limitation, not a hidden one:** the audit write is not currently issued in the same
-database transaction as the action it records — a crash between the action committing and the
-audit write executing would leave that one action unaudited. The original design intent above
-(same-transaction, considered as of Phase 0) is the correct end state; wiring it through means
-threading a `pgx.Tx` from each handler into the recorder, deferred to when handlers gain real
-multi-statement writes (uploads, reviews, approvals) worth wrapping in a transaction anyway.
+**Partially closed, and worth being precise about which half.** Pipeline state transitions *are*
+audited inside the transaction that performs them (`go/internal/pipeline`'s `transition`, which writes
+`jobs`, `consultations.state` and `audit_log` in one `pgx.Tx`) — §4.1's requirement, satisfiable there
+because the orchestrator already owns a multi-statement write.
+
+go-api's request handlers still are not: the audit write is issued after the action commits, so a
+crash in between would leave that one action unaudited. Wiring it through means threading a `pgx.Tx`
+from each handler into the recorder, still deferred to when handlers gain real multi-statement writes
+(reviews, approvals, export) worth wrapping in a transaction anyway.
 
 **Also not yet true:** `auth.login` for an email that does not exist is not audited (there is no
 org to attribute the attempt to without a resolved user row) — a narrow, documented gap, not an
@@ -742,10 +790,20 @@ header). Secrets via environment injection, never committed; `.env` is git-ignor
 - **Metrics:** Prometheus-format on `:9090` (go-api) and `:8081` (orchestrator). Key series — stage
   duration histograms, attempt counts, DLQ depth, quota-park events, `llm_cache` hit ratio, tokens
   consumed per model per day (the operational number that matters most on a free tier).
-  Implemented so far (`go/internal/http/metrics.go`): `coda_http_requests_total{method,route,status}`
+  Implemented in go-api (`go/internal/http/metrics.go`): `coda_http_requests_total{method,route,status}`
   and `coda_http_request_duration_seconds{method,route}`, on the dedicated metrics port so scraping
-  is never subject to the API's own auth or rate limits. The pipeline-stage series above land with
-  the orchestrator in the rest of Phase 3.
+  is never subject to the API's own auth or rate limits.
+  Implemented in go-orchestrator (`go/internal/pipeline/metrics.go`, served on `:8081/metrics`):
+  `coda_pipeline_transitions_total{state}`, `coda_pipeline_dispatches_total{stage}`,
+  `coda_pipeline_stage_outcomes_total{stage,status}`, `coda_pipeline_quota_parks_total{stage}`,
+  `coda_pipeline_dead_letters_total{stage}`, `coda_pipeline_reclaimed_messages_total{stage}`,
+  `coda_pipeline_stage_timeouts_total{stage}`, `coda_pipeline_duplicate_results_total{stage}`,
+  `coda_pipeline_cancellations_total{reason}`, plus the `coda_pipeline_dlq_depth` and
+  `coda_pipeline_jobs{state}` gauges refreshed by the periodic DLQ-alert job. Quota parks get their
+  own counter rather than being folded into stage outcomes because on a free tier they predict an
+  eval sweep's wall-clock, and a run that parks forty times a day is rate-limited, not failing —
+  indistinguishable in a generic error counter. Per-stage token totals come from
+  `job_stages.metrics` rather than a Prometheus series, since they must survive a scrape gap.
 - **Logs:** structured JSON, `trace_id` on every line, no PII — redacted text only.
 
 ---

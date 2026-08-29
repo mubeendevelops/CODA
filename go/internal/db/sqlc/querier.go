@@ -24,7 +24,13 @@ type Querier interface {
 	// idempotency_key claims nothing new — the caller falls through to
 	// GetJobStageByIdempotencyKey to find the existing row's status.
 	ClaimJobStage(ctx context.Context, arg ClaimJobStageParams) (*JobStage, error)
+	// Terminal success write for one stage. percent_complete is forced to 100
+	// so a UI reading the last heartbeat doesn't show a succeeded stage at 60%.
+	CompleteJobStage(ctx context.Context, arg CompleteJobStageParams) (*JobStage, error)
 	CompleteReview(ctx context.Context, arg CompleteReviewParams) (*Review, error)
+	// Feeds the orchestrator's Prometheus gauges (§8: "attempt counts, DLQ
+	// depth, quota-park events").
+	CountJobsByState(ctx context.Context) ([]*CountJobsByStateRow, error)
 	CreateArtifact(ctx context.Context, arg CreateArtifactParams) (*Artifact, error)
 	CreateAuditLogEntry(ctx context.Context, arg CreateAuditLogEntryParams) (*AuditLog, error)
 	CreateClinicalNote(ctx context.Context, arg CreateClinicalNoteParams) (*ClinicalNote, error)
@@ -60,9 +66,31 @@ type Querier interface {
 	// The caller must capture what it needs for the audit `before` snapshot
 	// and delete MinIO objects *before* calling this — the row is gone after.
 	DeleteConsultation(ctx context.Context, id uuid.UUID) error
+	// Dedupe protocol (§2.3) from the orchestrator's side, as one statement.
+	//
+	// A first dispatch inserts. A retry, a reaper re-dispatch, or a restarted
+	// orchestrator re-running its scan hits the idempotency_key conflict and
+	// updates the same row in place — attempt/deadline move, started_at and
+	// error_history are preserved.
+	//
+	// The DO UPDATE ... WHERE guard is the load-bearing part: a row already
+	// 'succeeded' matches no update, so the statement returns *no rows*. That
+	// is the caller's signal to skip dispatch entirely and reuse the stored
+	// result_ref (GetJobStageByIdempotencyKey), which is what stops an
+	// expensive stage being re-paid for after a crash. It is enforced by the
+	// UNIQUE constraint, not by orchestrator correctness (ADR-0007).
+	DispatchJobStage(ctx context.Context, arg DispatchJobStageParams) (*JobStage, error)
 	// DPDP erasure on consent withdrawal (§7.2): nulls the PII-bearing columns
 	// and sets the tombstone timestamp. The row itself is retained.
 	EraseConsultation(ctx context.Context, id uuid.UUID) (*Consultation, error)
+	// Records one failed attempt. error_history is *appended* to, never
+	// replaced — it is the DeadLetter.attempts[] field (§2.5: "carries the
+	// original envelope, every attempt's error"), and a DLQ message must be
+	// reconstructible from Postgres after Redis has trimmed the stream.
+	FailJobStage(ctx context.Context, arg FailJobStageParams) (*JobStage, error)
+	// Orphan detection for the retention sweep: a MinIO object with no
+	// artifacts row is unreferenced.
+	GetArtifactByURI(ctx context.Context, uri string) (*Artifact, error)
 	// Query pattern: fetch full pipeline artifacts for one consultation.
 	GetClinicalNoteForConsultationAndRunConfig(ctx context.Context, arg GetClinicalNoteForConsultationAndRunConfigParams) (*ClinicalNote, error)
 	GetConsentRecord(ctx context.Context, id uuid.UUID) (*ConsentRecord, error)
@@ -76,6 +104,10 @@ type Querier interface {
 	// Dedupe protocol step 1 (§2.3): check for an already-succeeded row before
 	// doing any work.
 	GetJobStageByIdempotencyKey(ctx context.Context, idempotencyKey string) (*JobStage, error)
+	// Resolve a result/heartbeat message to its row when the sender echoed a
+	// stale idempotency_key (a reclaimed message predating an input change).
+	// Newest first: a stage re-run under a changed input has more than one row.
+	GetJobStageByJobAndStage(ctx context.Context, arg GetJobStageByJobAndStageParams) (*JobStage, error)
 	GetLLMCacheEntry(ctx context.Context, arg GetLLMCacheEntryParams) (*LlmCache, error)
 	GetOrg(ctx context.Context, id uuid.UUID) (*Org, error)
 	// No uniqueness constraint on name (an org can rename); used only by the
@@ -101,8 +133,38 @@ type Querier interface {
 	// Query pattern: list/filter/paginate consultations by org, org-scoped.
 	// Pass state/language = NULL to not filter on that dimension.
 	ListConsultationsByOrgAndState(ctx context.Context, arg ListConsultationsByOrgAndStateParams) ([]*Consultation, error)
+	// The orchestrator's dispatch scan, and the reason a crashed orchestrator
+	// resumes on restart without anyone re-submitting anything: a job parked
+	// in a *_queued state is picked up here whether it got there from
+	// POST /jobs, a retry backoff, a quota park, or an orchestrator that died
+	// between persisting the transition and XADDing the envelope.
+	//
+	// Consent is re-checked at every dispatch, not only at upload (§7.2), so
+	// a mid-pipeline revocation halts processing; the same join drops
+	// cancel-requested and erased consultations.
+	ListDispatchableJobs(ctx context.Context, arg ListDispatchableJobsParams) ([]*Job, error)
+	// Retention sweep input: consultations whose DPDP erasure (§7.2) set the
+	// tombstone. The sweep re-deletes their MinIO prefix, so an erasure that
+	// crashed part-way through object deletion converges instead of leaving
+	// orphaned audio behind.
+	ListErasedConsultations(ctx context.Context, limit int32) ([]*Consultation, error)
 	// Query pattern: fetch full pipeline artifacts for one consultation.
 	ListExtractionsByConsultationAndRunConfig(ctx context.Context, arg ListExtractionsByConsultationAndRunConfigParams) ([]*Extraction, error)
+	// Every reason a job must stop, in one scan.
+	//
+	// Cancellation is cooperative (§4.4): go-api flips
+	// consultations.cancel_requested, and the orchestrator observes it here.
+	// Erasure and consent revocation are folded in deliberately: those two
+	// conditions also *exclude* a job from ListDispatchableJobs, so if this
+	// scan only looked at cancel_requested, a consultation whose consent was
+	// withdrawn mid-pipeline would silently stop being dispatched and then sit
+	// in a non-terminal state forever — invisible to every operator query that
+	// asks "what is still running". §7.2 requires processing to halt, which
+	// means reaching a terminal state, not merely ceasing to advance.
+	//
+	// Non-terminal jobs only — a halt arriving after EXPORTED is a no-op, not a
+	// state regression.
+	ListHaltedJobs(ctx context.Context, arg ListHaltedJobsParams) ([]*Job, error)
 	// Query pattern: fetch a job with its stages — step 2 of 2.
 	ListJobStagesByJob(ctx context.Context, jobID uuid.UUID) ([]*JobStage, error)
 	// Orchestrator resume-scan: quota-parked or retry-backoff jobs whose
@@ -111,6 +173,17 @@ type Querier interface {
 	ListJobsByConsultation(ctx context.Context, consultationID uuid.UUID) ([]*Job, error)
 	ListReferenceLabelsByConsultation(ctx context.Context, consultationID uuid.UUID) ([]*ReferenceLabel, error)
 	ListReviewEditsByReview(ctx context.Context, reviewID uuid.UUID) ([]*ReviewEdit, error)
+	// Stale-job reaping (the Asynq periodic job): a job sitting in a
+	// *_running state with nothing having touched it for longer than the
+	// stage's visibility timeout. Distinct from ListStalledJobStages, which
+	// finds the stalled *message*; this finds a job whose stage row went
+	// missing or whose dispatch never landed at all.
+	ListStaleJobs(ctx context.Context, arg ListStaleJobsParams) ([]*Job, error)
+	// §2.4's stall detection, the Postgres half. XAUTOCLAIM finds messages
+	// idle in the PEL; this finds stages whose *worker* went quiet — past its
+	// soft deadline (§4.2), or heartbeat-silent for longer than the allowed
+	// gap even while still inside the visibility window.
+	ListStalledJobStages(ctx context.Context, arg ListStalledJobStagesParams) ([]*JobStage, error)
 	// Query pattern: fetch full pipeline artifacts for one consultation — the
 	// serialized thought graph (nodes from ListThoughtsByConsultationAndRunConfig,
 	// edges from here) for the case-study figures (plan.md Phase 6/10).
@@ -119,7 +192,31 @@ type Querier interface {
 	ListThoughtsByConsultationAndRunConfig(ctx context.Context, arg ListThoughtsByConsultationAndRunConfigParams) ([]*Thought, error)
 	ListTurnsByTranscript(ctx context.Context, transcriptID uuid.UUID) ([]*Turn, error)
 	ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]*User, error)
+	// Orchestrator transition step 1 (docs/architecture.md §4.1: "all
+	// transitions append to audit_log inside the same transaction that
+	// performs the transition"). Row-locks the job for the duration of the
+	// transaction so two orchestrator replicas — or a redelivered result
+	// racing a reaper re-dispatch — cannot interleave a read-modify-write on
+	// the same job.
+	LockJob(ctx context.Context, id uuid.UUID) (*Job, error)
 	MarkReferenceLabelVerified(ctx context.Context, arg MarkReferenceLabelVerifiedParams) (*ReferenceLabel, error)
+	// Lands one StageHeartbeat from stage.progress (§2.4). The orchestrator is
+	// the only sanctioned consumer of stage.* streams (§1.2), so this row is
+	// how progress reaches go-api's SSE endpoint — it polls Postgres and never
+	// touches Redis (claude_context.md decision #35).
+	//
+	// Only 'running' rows are updated: a heartbeat that arrives after the
+	// result (reordering is legal on separate streams) must not resurrect a
+	// finished stage or walk percent_complete back down from 100.
+	RecordJobStageHeartbeat(ctx context.Context, arg RecordJobStageHeartbeatParams) (int64, error)
+	// Cancellation is cooperative and consultation-scoped (§4.4 + §5.2). The
+	// flag lives on consultations, not jobs: claude_context.md records that
+	// §4.4's prose ("go-api sets jobs.cancel_requested") disagrees with the
+	// §5.2 table the schema was built from, resolved in favour of §5.2. A
+	// consultation's jobs are its ablation arms, so cancelling the
+	// consultation cancels every arm — which is what a user clicking "cancel"
+	// means.
+	RequestConsultationCancel(ctx context.Context, id uuid.UUID) (*Consultation, error)
 	RevokeAllUserRefreshTokens(ctx context.Context, userID uuid.UUID) error
 	RevokeConsentRecord(ctx context.Context, id uuid.UUID) (*ConsentRecord, error)
 	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
@@ -128,6 +225,13 @@ type Querier interface {
 	// Written by the mandatory REDACT_RUNNING stage (§7.3); only this text is
 	// ever placed in a prompt.
 	SetTurnRedactedText(ctx context.Context, arg SetTurnRedactedTextParams) (*Turn, error)
+	// The single write every state transition goes through. state,
+	// current_stage, attempt, resume_after and error move together because
+	// §2.5's rules relate them: a retry bumps attempt, a quota park sets
+	// resume_after and leaves attempt alone, and a terminal failure sets
+	// error. Splitting them across statements would let a crash land the job
+	// in a combination the state machine never intends.
+	TransitionJob(ctx context.Context, arg TransitionJobParams) (*Job, error)
 	// Written by the audio-confirm endpoint once StatObject verifies the
 	// upload landed — source_audio_uri/audio_sha256/duration_sec are direct
 	// columns on consultations (architecture.md §5.2), not an `artifacts` row:
@@ -138,6 +242,12 @@ type Querier interface {
 	UpdateEvalRunStatus(ctx context.Context, arg UpdateEvalRunStatusParams) (*EvalRun, error)
 	UpdateJobStageResult(ctx context.Context, arg UpdateJobStageResultParams) (*JobStage, error)
 	UpdateJobState(ctx context.Context, arg UpdateJobStateParams) (*Job, error)
+	// Artifact keys are immutable (§3.3), so a conflict on uri means a
+	// *duplicate delivery* of the same stage result, not a changed artifact —
+	// at-least-once delivery (ADR-0007) makes that routine. DO UPDATE with a
+	// no-op assignment (rather than DO NOTHING) so the existing row is still
+	// RETURNINGed and the caller has one code path.
+	UpsertArtifact(ctx context.Context, arg UpsertArtifactParams) (*Artifact, error)
 }
 
 var _ Querier = (*Queries)(nil)

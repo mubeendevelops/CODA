@@ -1,0 +1,36 @@
+[project]
+name = "coda-worker-sdk"
+version = "0.0.1"
+description = "Reusable worker SDK for CODA's Python services: Redis Streams consumer-group loop, protojson codec, MinIO artifact helpers, heartbeats, structured logging, Prometheus metrics, an exception boundary, and a small gRPC server harness. Not itself a worker — asr-service and nlp-service build on it."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "coda-proto",
+    "redis>=5.0,<6",
+    "minio>=7.2,<8",
+    "prometheus-client>=0.20,<1",
+    "grpcio>=1.68,<2",
+    "grpcio-health-checking>=1.68,<2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8,<1",
+    "mypy>=1.13,<2",
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "types-grpcio>=1.0,<2",
+    "types-protobuf>=5.28,<6",
+]
+
+[tool.uv.sources]
+coda-proto = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coda_worker_sdk"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
