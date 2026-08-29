@@ -1,6 +1,7 @@
-// Command api is go-api: the REST control plane (docs/architecture.md §1.2).
-// Phase 0: serves only health/readiness and a metrics stub. Auth, uploads,
-// job submission, and the review/export endpoints land in Phase 3.
+// Command api is go-api: the REST control plane (docs/architecture.md
+// §1.2). Auth, RBAC, audit logging, and the review-facing read endpoints
+// land here in Phase 3; uploads, job submission, and export follow once
+// the queue and orchestrator exist.
 package main
 
 import (
@@ -12,10 +13,13 @@ import (
 	"syscall"
 	"time"
 
+	"coda/go/internal/audit"
+	"coda/go/internal/auth"
+	"coda/go/internal/config"
+	"coda/go/internal/db"
+	"coda/go/internal/db/sqlc"
 	codahttp "coda/go/internal/http"
 	"coda/go/internal/telemetry"
-
-	"coda/go/internal/config"
 )
 
 const serviceName = "go-api"
@@ -23,25 +27,56 @@ const serviceName = "go-api"
 var version = "dev"
 
 func main() {
-	cfg := config.LoadBase(serviceName)
-	logger := telemetry.NewLogger(cfg.ServiceName, cfg.LogLevel)
+	baseCfg := config.LoadBase(serviceName)
+	logger := telemetry.NewLogger(baseCfg.ServiceName, baseCfg.LogLevel)
 
-	httpPort := getenv("HTTP_PORT", "8080")
-	metricsPort := getenv("METRICS_PORT", "9090")
-
-	apiSrv := &http.Server{
-		Addr:              ":" + httpPort,
-		Handler:           codahttp.NewHealthRouter(serviceName, version),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-	metricsSrv := &http.Server{
-		Addr:              ":" + metricsPort,
-		Handler:           metricsStubHandler(),
-		ReadHeaderTimeout: 5 * time.Second,
+	// Load and validate every config group before touching the network —
+	// fail fast on a missing or weak secret rather than on the first
+	// request that needs it (task instructions; docs/architecture.md §0).
+	dbCfg := config.LoadDB()
+	authCfg := config.LoadAuth()
+	serverCfg := config.LoadServer()
+	if err := mustValidate(authCfg, serverCfg); err != nil {
+		logger.Error("invalid configuration", "error", err)
+		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	pool, err := db.NewPool(ctx, dbCfg.DSN())
+	if err != nil {
+		logger.Error("connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	queries := sqlc.New(pool)
+	jwtSvc := auth.NewJWTService(authCfg.JWTSigningKey, authCfg.AccessTokenTTL)
+	recorder := audit.NewSQLRecorder(queries)
+
+	router := codahttp.NewRouter(codahttp.RouterDeps{
+		ServiceName: serviceName,
+		Version:     version,
+		Pool:        pool,
+		Queries:     queries,
+		JWT:         jwtSvc,
+		Recorder:    recorder,
+		Logger:      logger,
+		ServerCfg:   serverCfg,
+		AuthCfg:     authCfg,
+	})
+
+	apiSrv := &http.Server{
+		Addr:              ":" + serverCfg.HTTPPort,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	metricsSrv := &http.Server{
+		Addr:              ":" + serverCfg.MetricsPort,
+		Handler:           codahttp.NewMetricsRouter(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 
 	go runServer(logger, "api", apiSrv)
 	go runServer(logger, "metrics", metricsSrv)
@@ -55,25 +90,24 @@ func main() {
 	_ = metricsSrv.Shutdown(shutdownCtx)
 }
 
+// mustValidate never receives or logs a secret value itself — Auth.Validate
+// only inspects length, and any returned error string is built from field
+// names and lengths, never JWTSigningKey (docs/architecture.md §0: "no
+// secret ever logged").
+func mustValidate(authCfg config.Auth, serverCfg config.Server) error {
+	if err := authCfg.Validate(); err != nil {
+		return err
+	}
+	if err := serverCfg.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func runServer(logger *slog.Logger, name string, srv *http.Server) {
 	logger.Info("listening", "server", name, "addr", srv.Addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Error("server failed", "server", name, "error", err)
 		os.Exit(1)
 	}
-}
-
-func metricsStubHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("# Prometheus metrics land in Phase 3 (docs/architecture.md §8)\n"))
-	})
-}
-
-func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }

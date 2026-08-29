@@ -1,10 +1,18 @@
 SHELL := /usr/bin/env bash
 export PATH := $(HOME)/.local/bin:$(HOME)/go/bin:$(PATH)
 
+# .env is git-ignored (see .env.example) — load it if present so
+# migrate/seed can build a DSN without every developer exporting vars by
+# hand. Silently absent on a fresh clone before `cp .env.example .env`.
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
 .PHONY: proto generate build build-go build-python build-frontend \
-        test test-go test-python test-frontend \
+        test test-go test-python test-frontend test-integration \
         lint lint-go lint-python lint-frontend \
-        up down migrate seed e2e clean
+        up down migrate migrate-test seed e2e clean
 
 ## proto: regenerate Go + Python types from proto/coda/v1/*.proto (commits generated code).
 proto:
@@ -40,6 +48,14 @@ test-python:
 test-frontend:
 	cd frontend && npm run test -- --run
 
+## test-integration: run go-api's integration tests against a real,
+## disposable Postgres container (testcontainers-go) — auth, RBAC, and
+## org-scoping end to end over real HTTP. Excluded from `make test` (the
+## `integration` build tag) since it needs Docker and takes longer; needs
+## the `migrate` CLI on PATH the same way `make migrate-test` does.
+test-integration:
+	cd go && go test -tags=integration ./internal/http/...
+
 ## lint: lint every service.
 lint: lint-go lint-python lint-frontend
 
@@ -64,13 +80,23 @@ up:
 down:
 	docker compose down
 
-## migrate: apply Postgres migrations (Phase 3 — no migrations exist yet).
+## migrate: apply Postgres migrations to the running dev-compose database.
 migrate:
-	@echo "no migrations yet — implemented in Phase 3 (docs/architecture.md §5)"
+	migrate -path go/migrations \
+		-database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_HOST_PORT)/$(POSTGRES_DB)?sslmode=disable" \
+		up
 
-## seed: load dev seed data (Phase 3+ — no seed data exists yet).
+## migrate-test: prove migrations are reversible (up -> down -> up) against
+## a disposable Postgres container — does not touch the dev database.
+migrate-test:
+	./scripts/migrate_test.sh
+
+## seed: load dev seed data (one org, a doctor + admin user, two consultations).
+## Overrides POSTGRES_HOST/PORT from .env (the in-Docker-network values) to
+## the host-side localhost:$(POSTGRES_HOST_PORT) mapping, since this runs
+## outside Docker.
 seed:
-	@echo "no seed data yet — implemented alongside Phase 3/4"
+	cd go && POSTGRES_HOST=localhost POSTGRES_PORT=$(POSTGRES_HOST_PORT) go run ./cmd/seed
 
 ## e2e: end-to-end pipeline test against a running stack (Phase 1+ — nothing to test yet).
 e2e:

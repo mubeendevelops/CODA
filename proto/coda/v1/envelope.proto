@@ -10,8 +10,8 @@ option go_package = "coda/go/internal/genproto/coda/v1;codev1";
 // StageEnvelope is the message the orchestrator XADDs to stage.asr / stage.nlp.
 // See architecture.md §2.2.
 message StageEnvelope {
-  string job_id = 1;              // ULID
-  string consultation_id = 2;     // ULID
+  string job_id = 1;              // UUID
+  string consultation_id = 2;     // UUID
   Stage stage = 3;
   uint32 attempt = 4;             // 1-based
   string idempotency_key = 5;     // sha256(consultation_id . stage . run_config_id . input_sha256)

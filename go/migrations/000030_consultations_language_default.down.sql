@@ -1,0 +1,1 @@
+ALTER TABLE consultations ALTER COLUMN language DROP DEFAULT;

@@ -26,8 +26,8 @@ const (
 // See architecture.md §2.2.
 type StageEnvelope struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	JobId          string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`                            // ULID
-	ConsultationId string                 `protobuf:"bytes,2,opt,name=consultation_id,json=consultationId,proto3" json:"consultation_id,omitempty"` // ULID
+	JobId          string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`                            // UUID
+	ConsultationId string                 `protobuf:"bytes,2,opt,name=consultation_id,json=consultationId,proto3" json:"consultation_id,omitempty"` // UUID
 	Stage          Stage                  `protobuf:"varint,3,opt,name=stage,proto3,enum=coda.v1.Stage" json:"stage,omitempty"`
 	Attempt        uint32                 `protobuf:"varint,4,opt,name=attempt,proto3" json:"attempt,omitempty"`                                    // 1-based
 	IdempotencyKey string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"` // sha256(consultation_id . stage . run_config_id . input_sha256)

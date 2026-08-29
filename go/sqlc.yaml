@@ -1,0 +1,39 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "internal/db/queries"
+    schema: "migrations"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/db/sqlc"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_db_tags: true
+        emit_interface: true
+        emit_result_struct_pointers: true
+        overrides:
+          # google/uuid.UUID is a far more usable type than pgx's own
+          # pgtype.UUID for anything that leaves the query layer (JSON
+          # marshaling, string formatting, equality) — applied globally by
+          # db_type rather than per-column since every primary/foreign key
+          # in this schema is a uuid.
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+
+          # pipeline_state and pipeline_stage (go/migrations/000010_domains)
+          # are Postgres DOMAINs over text, not types sqlc's catalog
+          # recognizes — without these overrides it falls back to `any`,
+          # which is not what "type-safe" means. Both are plain strings at
+          # the wire level regardless of the domain's CHECK constraint.
+          - db_type: "pipeline_state"
+            go_type: "string"
+          - db_type: "pipeline_stage"
+            go_type: "string"
+          # jobs.current_stage is the only nullable column of either domain
+          # type (a job before dispatch has no current stage yet); the
+          # column-specific override takes precedence over the two above.
+          - column: "jobs.current_stage"
+            go_type:
+              type: "string"
+              pointer: true

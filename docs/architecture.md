@@ -32,8 +32,8 @@ decision in `claude_context.md` §7.
 | Service | Language | Ports | Exposed to |
 |---|---|---|---|
 | `frontend` | React 18 / Vite / TS | `5173` (dev), `8000` (prod nginx) | browser |
-| `go-api` | Go 1.23 | `8080` HTTP/REST, `9090` metrics | browser, operator |
-| `go-orchestrator` | Go 1.23 | `8081` health + metrics only | operator only — **no public API** |
+| `go-api` | Go 1.25 | `8080` HTTP/REST, `9090` metrics | browser, operator |
+| `go-orchestrator` | Go 1.25 | `8081` health + metrics only | operator only — **no public API** |
 | `asr-service` | Python 3.11 | `50051` gRPC, `8082` health | internal network only |
 | `nlp-service` | Python 3.11 | `50052` gRPC, `8083` health | internal network only |
 | `postgres` | — | `5432` | internal network only |
@@ -147,8 +147,8 @@ Protobuf-defined, protojson on the wire (**ADR-0004**). Every stage request carr
 
 ```protobuf
 message StageEnvelope {
-  string   job_id            = 1;  // ULID
-  string   consultation_id   = 2;  // ULID
+  string   job_id            = 1;  // UUID
+  string   consultation_id   = 2;  // UUID
   Stage    stage             = 3;  // STAGE_ASR | STAGE_REDACT | STAGE_NLP | ...
   uint32   attempt           = 4;  // 1-based
   string   idempotency_key   = 5;  // see §2.3
@@ -339,12 +339,12 @@ while config-dependent outputs never collide.
 Concrete examples:
 
 ```
-dev/consultations/01HQ.../source/audio/sha256-9f2a....wav
-dev/consultations/01HQ.../stages/asr/01HR.../transcript.json
-dev/consultations/01HQ.../stages/nlp/01HR.../thought_graph.json
-dev/consultations/01HQ.../stages/nlp/01HR.../candidate_sets.json
-dev/consultations/01HQ.../stages/nlp/01HR.../clinical_note.json
-dev/eval/01HS.../got_k2/01HQ.../metrics.json
+dev/consultations/3fa85f64-5717-4562-b3fc-2c963f66afa6/source/audio/sha256-9f2a....wav
+dev/consultations/3fa85f64-5717-4562-b3fc-2c963f66afa6/stages/asr/7c9e6679-7425-40de-944b-e07fc1f90ae7/transcript.json
+dev/consultations/3fa85f64-5717-4562-b3fc-2c963f66afa6/stages/nlp/7c9e6679-7425-40de-944b-e07fc1f90ae7/thought_graph.json
+dev/consultations/3fa85f64-5717-4562-b3fc-2c963f66afa6/stages/nlp/7c9e6679-7425-40de-944b-e07fc1f90ae7/candidate_sets.json
+dev/consultations/3fa85f64-5717-4562-b3fc-2c963f66afa6/stages/nlp/7c9e6679-7425-40de-944b-e07fc1f90ae7/clinical_note.json
+dev/eval/b2f1a4d0-9c3e-4b7a-8f2d-1e6a9d5c7f31/got_k2/3fa85f64-5717-4562-b3fc-2c963f66afa6/metrics.json
 ```
 
 Rules: keys are immutable once written (a re-run under a changed config gets a new `run_config_id`,
@@ -463,16 +463,17 @@ Artifacts from completed stages are retained (they remain valid inputs for a lat
 
 ## 5. Data model sketch
 
-Postgres 16. ULIDs for all primary keys (sortable, no coordination). `created_at` / `updated_at` on
-every table. Foreign keys enforced. Migrations via golang-migrate; queries via sqlc.
+Postgres 16. UUIDs (v4, `gen_random_uuid()` via `pgcrypto`) for all primary keys. `created_at` /
+`updated_at` on every table. Foreign keys enforced. Migrations via golang-migrate; queries via sqlc.
 
 ### 5.1 Tenancy and identity
 
 | Table | Key columns |
 |---|---|
 | `orgs` | `id`, `name`, `region`, `settings jsonb` |
-| `users` | `id`, `org_id → orgs`, `email UNIQUE`, `password_hash`, `role` (`doctor` \| `admin` \| `researcher`), `active` |
+| `users` | `id`, `org_id → orgs`, `email UNIQUE`, `password_hash` (Argon2id), `role` (`admin` \| `doctor` \| `reviewer` \| `auditor` — claude_context.md decision #30, migration 000027), `active` |
 | `consent_records` | `id`, `org_id`, `subject_ref` (pseudonymous, never a name), `consent_type`, `granted_at`, `granted_by → users`, `scope jsonb`, `artifact_uri`, `revoked_at` |
+| `refresh_tokens` | `id`, `user_id → users`, `family_id`, `token_hash UNIQUE` (SHA-256 of an opaque token, never the raw value), `issued_at`, `expires_at`, `revoked_at`, `replaced_by_id → refresh_tokens` (rotation chain), `created_by_ip`, `user_agent` — migration 000028; reuse of an already-rotated token (`replaced_by_id` set) revokes the whole `family_id`, not just that row |
 
 ### 5.2 Consultations and pipeline
 
@@ -507,7 +508,7 @@ plain `GROUP BY` rather than a file-parsing exercise.
 |---|---|
 | `reviews` | `id`, `clinical_note_id`, `reviewer_user_id → users`, `started_at`, `completed_at`, `outcome` (`approved` \| `rejected` \| `abandoned`) |
 | `review_edits` | `id`, `review_id`, `field_key`, `original_value jsonb`, `edited_value jsonb`, `edit_type` (`correction` \| `addition` \| `deletion` \| `regenerated`), `edited_at`, `editor_user_id` |
-| `audit_log` | `id`, `org_id`, `actor_user_id NULL`, `actor_service NULL`, `action`, `resource_type`, `resource_id`, `before jsonb`, `after jsonb`, `trace_id`, `ip inet NULL`, `at timestamptz` |
+| `audit_log` | `id`, `org_id`, `actor_user_id NULL`, `actor_service NULL`, `action`, `resource_type`, `resource_id`, `before jsonb`, `after jsonb`, `trace_id`, `ip inet NULL`, `at timestamptz`, `outcome` (`success` \| `failure` — migration 000029) |
 
 `review_edits` is the HITL data flywheel (decision #14): the original/edited pair per field is exactly
 the supervision signal a future fine-tune would need.
@@ -620,7 +621,8 @@ Relevant obligations at the architecture level: lawful consent, purpose limitati
 reasonable security safeguards, breach notification, and erasure on withdrawal of consent.
 
 **Scope statement, recorded honestly:** this system processes **role-play and public-dataset audio
-only**. No real patient data is used (decision #1; `plan.md` Phase 9 is explicitly simulated). The
+only**. No real patient data is used (decision #1; `plan.md` Phase 12 — v2, formerly Phase 9 — is
+explicitly simulated). The
 controls below are built because the architecture must be defensible and because the report claims
 them — not because live patient data is in scope.
 
@@ -667,11 +669,24 @@ backend would be mandatory. **ADR-0014** records this in full.
 
 ### 7.4 Audit logging
 
-Every state transition, authentication event, note read, edit, approval, export, regeneration, and
-erasure appends to `audit_log`, in the **same transaction** as the action itself — so an action cannot
-succeed unaudited. The table is append-only (trigger-enforced; UPDATE/DELETE revoked from the
-application role). Each entry carries `trace_id`, joining the audit trail to the distributed trace for
-any given consultation.
+Every mutating request and every read of clinical data appends to `audit_log`: actor, action,
+resource, org, IP, and outcome (`success`/`failure` — migration 000029 added this column;
+`go/internal/audit/middleware.go`). Auth bootstrap actions (register/login/refresh/logout) call the
+same `audit.Recorder` directly rather than through the middleware, since they run before a JWT
+identity exists to key the middleware off of (`go/internal/http/auth_handlers.go`). The table is
+append-only (trigger-enforced; UPDATE/DELETE revoked from the application role). Each entry carries
+`trace_id`, joining the audit trail to the distributed trace for any given consultation.
+
+**A stated limitation, not a hidden one:** the audit write is not currently issued in the same
+database transaction as the action it records — a crash between the action committing and the
+audit write executing would leave that one action unaudited. The original design intent above
+(same-transaction, considered as of Phase 0) is the correct end state; wiring it through means
+threading a `pgx.Tx` from each handler into the recorder, deferred to when handlers gain real
+multi-statement writes (uploads, reviews, approvals) worth wrapping in a transaction anyway.
+
+**Also not yet true:** `auth.login` for an email that does not exist is not audited (there is no
+org to attribute the attempt to without a resolved user row) — a narrow, documented gap, not an
+oversight (`go/internal/http/auth_handlers.go`, `Login`).
 
 ### 7.5 No auto-save before doctor approval
 
@@ -688,17 +703,35 @@ without a human in the loop.
 
 ### 7.6 Authentication and authorization
 
-JWT access tokens (15 min) with refresh tokens (7 days, rotating, revocable). Three roles:
+JWT access tokens (15 min default, HS256) with opaque refresh tokens (7 days default, rotating,
+revocable — `refresh_tokens`, §5.1). Password hashing is Argon2id (`go/internal/auth/password.go`).
+Four roles (**claude_context.md decision #30** — supersedes an earlier `doctor`/`admin`/`researcher`
+set that shipped with the initial `users` table before any code depended on it):
 
 | Role | May |
 |---|---|
 | `doctor` | Upload, view, review, edit, approve, export own-org consultations |
-| `admin` | All of the above plus user management and audit-log read |
-| `researcher` | Read de-identified aggregates and run evaluations; **no** access to source audio or unredacted transcripts |
+| `reviewer` | The same review/edit/approve/view/export set as `doctor`, minus upload — a second clinician in a review workflow |
+| `admin` | Everything `doctor`/`reviewer` can, plus user management (registration) and audit-log read |
+| `auditor` | Read-only: `audit_log` and de-identified aggregates. **No** access to source audio, unredacted transcripts, or clinical note content |
 
-Org-scoped row filtering on every query — no cross-org read is expressible through the API. Rate
-limiting on upload and auth endpoints. Secrets via environment injection, never committed; `.env` is
-git-ignored and `.env.example` carries only placeholder values.
+Enforced at two layers deliberately, not either/or: role membership by route middleware
+(`auth.RequireRole`), and org-scoping again at the handler level after the resource is loaded
+(`auth.RequireSameOrg`) — every query is parameterized on the caller's own `org_id` from their JWT
+claims, never a caller-supplied one, so no cross-org read is expressible through the API. A
+cross-org access attempt reports `404`, not `403` — indistinguishable from "does not exist", so
+existence in another org is never leaked. Integration-tested adversarially
+(`go/internal/http/integration_test.go`, `TestIntegration_OrgScopingCrossOrgReadIsDenied`).
+
+Refresh-token reuse (presenting a token already superseded by rotation) is treated as a compromise
+signal and revokes the entire rotation family, not just the reused token.
+
+Rate limiting on upload and auth endpoints (`/v1/auth/*` gets its own, stricter bucket — go-api is
+directly exposed to clients in this topology, so the rate limiter keys off the TCP peer address,
+stated explicitly via `middleware.ClientIPFromRemoteAddr` rather than a spoofable forwarded-for
+header). Secrets via environment injection, never committed; `.env` is git-ignored and
+`.env.example` carries only placeholder values; `JWT_SIGNING_KEY` is validated at startup
+(minimum length) and never appears in a log line (`config.Auth.LogValue`/`String` redact it).
 
 ---
 
@@ -709,6 +742,10 @@ git-ignored and `.env.example` carries only placeholder values.
 - **Metrics:** Prometheus-format on `:9090` (go-api) and `:8081` (orchestrator). Key series — stage
   duration histograms, attempt counts, DLQ depth, quota-park events, `llm_cache` hit ratio, tokens
   consumed per model per day (the operational number that matters most on a free tier).
+  Implemented so far (`go/internal/http/metrics.go`): `coda_http_requests_total{method,route,status}`
+  and `coda_http_request_duration_seconds{method,route}`, on the dedicated metrics port so scraping
+  is never subject to the API's own auth or rate limits. The pipeline-stage series above land with
+  the orchestrator in the rest of Phase 3.
 - **Logs:** structured JSON, `trace_id` on every line, no PII — redacted text only.
 
 ---

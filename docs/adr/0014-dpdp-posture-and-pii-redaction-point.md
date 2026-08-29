@@ -42,7 +42,8 @@ swappable backend rather than an afterthought, and why `RunConfig` records which
 transcript.
 
 For this project the exposure is acceptable: the system processes **role-play and public-dataset audio
-only, with no real patient data** (decision #1; Phase 9 is explicitly simulated). For real patient data
+only, with no real patient data** (decision #1; `plan.md` Phase 12 — v2, formerly Phase 9 — is
+explicitly simulated). For real patient data
 the local backend would be mandatory, and the report says so rather than implying the hosted path is
 compliant.
 
