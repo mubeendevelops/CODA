@@ -8,7 +8,10 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/venv
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# ffmpeg: asr-service's audio preprocessing (pydub) shells out to it for
+# mp3 decoding; harmless extra weight for nlp-service, which shares this
+# image definition but never calls it.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /src

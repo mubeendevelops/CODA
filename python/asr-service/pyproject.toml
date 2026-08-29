@@ -1,11 +1,22 @@
 [project]
 name = "asr-service"
 version = "0.0.1"
-description = "Groq whisper-large-v3-turbo transcription + pyannote.audio diarization + transcript assembly. Owns audio only; knows nothing about clinical fields or the thought graph (architecture.md §1.2)."
+description = "faster-whisper (CTranslate2) transcription + pyannote.audio 3.1 diarization + Groq few-shot Doctor/Patient role assignment + transcript assembly. Owns audio only; knows nothing about clinical fields or the thought graph (architecture.md §1.2)."
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "coda-proto",
     "coda-worker-sdk",
+    "faster-whisper>=1.0,<2",
+    "pyannote.audio>=3.1,<3.2",
+    # Pinned narrowly, not just >=2.0 (pyannote.audio 3.1.1's declared floor):
+    # torchaudio >=2.2 removed the `set_audio_backend` API pyannote.audio
+    # 3.1.1 calls at import time (AttributeError on import otherwise).
+    "torch>=2.1,<2.2",
+    "torchaudio>=2.1,<2.2",
+    "pydub>=0.25,<1",
+    # pyannote.audio 3.1.1 still references the numpy<2 `np.NaN` alias.
+    "numpy>=1.26,<2",
+    "httpx>=0.27,<1",
 ]
 
 [dependency-groups]
@@ -20,6 +31,16 @@ dev = [
 [tool.uv.sources]
 coda-proto = { workspace = true }
 coda-worker-sdk = { workspace = true }
+# CPU-only wheels (claude_context.md decision #8: no local GPU; GPU work
+# goes to Colab, not this service). Without this uv resolves the default
+# CUDA-bundled torch wheels, which are gigabytes larger for no benefit here.
+torch = [{ index = "pytorch-cpu" }]
+torchaudio = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

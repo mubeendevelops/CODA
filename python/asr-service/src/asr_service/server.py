@@ -1,10 +1,10 @@
 """asr-service entrypoint.
 
-Consumes stage.asr and returns a valid StageResult per envelope. Phase 3's
-walking-skeleton echo worker (see worker.py) — real Groq/pyannote
-transcription replaces `handle_asr_stage`'s body in Phase 1, nothing else
-here changes. This worker must never know about clinical fields or the
-thought graph (docs/architecture.md §1.2).
+Consumes stage.asr and returns a valid StageResult per envelope. Loads
+faster-whisper + pyannote once here at process startup (asr_service.models)
+before the consumer loop ever starts, so no message pays model-load cost and
+none can be dispatched before the models are ready. This worker must never
+know about clinical fields or the thought graph (docs/architecture.md §1.2).
 """
 
 from __future__ import annotations
@@ -14,7 +14,9 @@ import signal
 
 import redis.asyncio as aioredis
 
-from asr_service.worker import handle_asr_stage
+from asr_service.config import AsrConfig
+from asr_service.models import ModelBundle, load_models
+from asr_service.worker import build_asr_handler
 from coda_worker_sdk import (
     RedisConfig,
     ServiceConfig,
@@ -36,6 +38,8 @@ async def _amain() -> None:
     )
     logger = configure_logging(SERVICE_NAME, cfg.log_level)
 
+    asr_cfg = AsrConfig.from_env()  # fails fast if HF_TOKEN / GROQ_API_KEY are unset
+
     redis_cfg = RedisConfig.from_env()
     redis = aioredis.Redis(
         host=redis_cfg.host,
@@ -46,26 +50,43 @@ async def _amain() -> None:
     )
     storage = StorageClient(StorageConfig.from_env())
 
+    # /readyz reports not-ready until model loading finishes below — see
+    # docker-compose.yml's asr-service healthcheck, which polls /readyz so
+    # `depends_on: condition: service_healthy` actually waits on this.
+    holder: dict[str, ModelBundle | None] = {"bundle": None}
+
+    def _ready() -> bool:
+        bundle = holder["bundle"]
+        return bundle is not None and bundle.ready
+
+    http_server, _http_thread = serve_http(cfg.health_port, SERVICE_NAME, ready_check=_ready)
+
+    grpc_server = GrpcServer(service_name=SERVICE_NAME, port=cfg.grpc_port)
+    await grpc_server.start()
+
+    logger.info("loading ASR models (this can take a while on first run)")
+    bundle = await asyncio.to_thread(load_models, asr_cfg)
+    holder["bundle"] = bundle
+
     worker = StageWorker(
         service_name=SERVICE_NAME,
         redis=redis,
         storage=storage,
         stream=STREAM_ASR,
         group=GROUP_ASR_WORKERS,
-        handler=handle_asr_stage,
-        concurrency=4,
-        batch=8,
+        handler=build_asr_handler(bundle),
+        # Sequential by default: faster-whisper/pyannote are CPU-bound and
+        # already use multiple threads internally per call, so running
+        # several jobs concurrently would thrash rather than parallelise.
+        concurrency=1,
+        batch=2,
     )
-
-    grpc_server = GrpcServer(service_name=SERVICE_NAME, port=cfg.grpc_port)
-    http_server, _http_thread = serve_http(cfg.health_port, SERVICE_NAME)
 
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop_event.set)
 
-    await grpc_server.start()
     worker_task = asyncio.ensure_future(worker.run())
     logger.info(
         "listening",
@@ -74,6 +95,8 @@ async def _amain() -> None:
                 "grpc_port": cfg.grpc_port,
                 "health_port": cfg.health_port,
                 "stream": STREAM_ASR,
+                "model_size": asr_cfg.model_size,
+                "device": asr_cfg.device,
             }
         },
     )

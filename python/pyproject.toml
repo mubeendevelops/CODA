@@ -5,7 +5,7 @@ requires-python = ">=3.11,<3.12"
 dependencies = []
 
 [tool.uv.workspace]
-members = ["coda_proto", "shared", "asr-service", "nlp-service"]
+members = ["coda_proto", "shared", "asr-service", "nlp-service", "eval"]
 
 [tool.uv]
 package = false
@@ -13,7 +13,7 @@ package = false
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["coda_proto/src", "shared/src", "asr-service/src", "nlp-service/src"]
+src = ["coda_proto/src", "shared/src", "asr-service/src", "nlp-service/src", "eval/src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -24,7 +24,7 @@ strict = true
 warn_unused_ignores = true
 namespace_packages = true
 explicit_package_bases = true
-mypy_path = "coda_proto/src:shared/src"
+mypy_path = "coda_proto/src:shared/src:asr-service/src:eval/src"
 
 [[tool.mypy.overrides]]
 # grpcio-health-checking ships no py.typed stubs; types-grpcio doesn't cover it.

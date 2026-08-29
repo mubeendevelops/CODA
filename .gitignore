@@ -3,9 +3,16 @@
 *.pem
 *.key
 
-# Data — raw audio and anything derived from it never belongs in git
+# Data — raw audio and anything derived from it never belongs in git.
+# data/registry.yaml (the dataset-level summary — source/licence/N per
+# dataset) IS tracked; the per-item *.manifest.jsonl files under
+# data/registry/ and data/splits/ are not — they embed machine-local
+# absolute paths and are cheaply regenerated (`make eval-registry` /
+# `make eval-splits`).
 data/raw/
 data/splits/
+data/processed/
+data/registry/
 *.wav
 *.mp3
 *.flac

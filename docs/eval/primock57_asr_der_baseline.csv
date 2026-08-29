@@ -1,0 +1,2 @@
+dataset,language,n_items,wer,cer,der,der_missed_detection,der_false_alarm,der_confusion,notes
+primock57,en,8,0.2226,0.1666,,,,,8 of 57 upstream consultations (subset actually fetched)

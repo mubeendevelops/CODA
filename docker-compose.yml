@@ -165,17 +165,37 @@ services:
       REDIS_PORT: ${REDIS_PORT}
       REDIS_DB: ${REDIS_DB:-0}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      MODEL_CACHE_DIR: /model-cache
+      ASR_MODEL_SIZE: ${ASR_MODEL_SIZE:-medium}
+      ASR_DEVICE: ${ASR_DEVICE:-cpu}
+      ASR_COMPUTE_TYPE: ${ASR_COMPUTE_TYPE:-int8}
+      ASR_LANGUAGE: ${ASR_LANGUAGE:-en}
+      ASR_DIARIZATION_MODEL: ${ASR_DIARIZATION_MODEL:-pyannote/speaker-diarization-3.1}
+      ASR_ROLE_MODEL: ${ASR_ROLE_MODEL:-llama-3.1-8b-instant}
+      ASR_ROLE_CONFIDENCE_THRESHOLD: ${ASR_ROLE_CONFIDENCE_THRESHOLD:-0.6}
+      ASR_CHUNK_LENGTH_S: ${ASR_CHUNK_LENGTH_S:-300}
+      ASR_CHUNK_OVERLAP_S: ${ASR_CHUNK_OVERLAP_S:-5}
+      ASR_TARGET_LOUDNESS_DBFS: ${ASR_TARGET_LOUDNESS_DBFS:--20}
+    volumes:
+      - model-cache:/model-cache
     depends_on:
       redis:
         condition: service_healthy
       minio:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${ASR_HEALTH_PORT}/healthz"]
-      interval: 5s
+      # /readyz (not /healthz): asr-service loads faster-whisper + pyannote
+      # once at startup (asr_service/models.py) before it starts consuming
+      # stage.asr, so "healthy" here means "models loaded and warmed up",
+      # not just "process is up" — the distinction matters for e2e's
+      # depends_on: condition: service_healthy.
+      test: ["CMD", "curl", "-f", "http://localhost:${ASR_HEALTH_PORT}/readyz"]
+      interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 30
+      # Generous: a cold model-cache volume means downloading faster-whisper
+      # medium (~1.5GB) and pyannote 3.1's checkpoints on first run.
+      start_period: 300s
 
   nlp-service:
     build:
@@ -262,3 +282,4 @@ services:
 volumes:
   redis-data:
   minio-data:
+  model-cache:

@@ -12,7 +12,8 @@ endif
 .PHONY: proto generate build build-go build-python build-frontend \
         test test-go test-python test-frontend test-integration \
         lint lint-go lint-python lint-frontend \
-        up down migrate migrate-test seed e2e clean openapi-lint
+        up down migrate migrate-test seed e2e clean openapi-lint \
+        data eval-registry eval-splits eval-asr-der
 
 ## proto: regenerate Go + Python types from proto/coda/v1/*.proto (commits generated code).
 proto:
@@ -45,6 +46,7 @@ test-python:
 	cd python && uv run --project shared pytest -q shared/tests
 	cd python && uv run --project asr-service pytest -q asr-service/tests
 	cd python && uv run --project nlp-service pytest -q nlp-service/tests
+	cd python && uv run --project eval pytest -q eval/tests
 
 test-frontend:
 	cd frontend && npm run test -- --run
@@ -71,9 +73,11 @@ lint-python:
 	cd python && uv run --project shared ruff check shared/src shared/tests
 	cd python && uv run --project asr-service ruff check asr-service/src asr-service/tests
 	cd python && uv run --project nlp-service ruff check nlp-service/src nlp-service/tests
+	cd python && uv run --project eval ruff check eval/src eval/tests
 	cd python && uv run --project shared mypy shared/src
 	cd python && uv run --project asr-service mypy asr-service/src
 	cd python && uv run --project nlp-service mypy nlp-service/src
+	cd python && uv run --project eval mypy eval/src
 
 lint-frontend:
 	cd frontend && npm run lint
@@ -114,6 +118,30 @@ seed:
 ## SigV4 signature can't be rewritten to a host-reachable one after signing.
 e2e:
 	docker compose run --rm e2e
+
+## data: alias for eval-registry — plan.md Phase 2 AC 1 names it `make data`.
+## Note this only (re)builds the registry/manifests from whatever is already
+## under data/raw/ — it does not itself fetch datasets (git clone / git lfs
+## pull are still manual steps; see docs/eval/ for exactly what was fetched
+## and how). "Fetches and verifies every public dataset" is not yet met.
+data: eval-registry
+
+## eval-registry: (re)build the item manifest + data/registry.yaml from
+## whatever datasets are present under data/raw/ (plan.md Phase 2 AC 1).
+eval-registry:
+	cd python && uv run --project eval coda-eval registry
+
+## eval-splits: assign + validate session-disjoint train/dev/test splits for
+## one dataset. Usage: make eval-splits DATASET=primock57
+eval-splits:
+	cd python && uv run --project eval coda-eval splits --dataset $(DATASET)
+
+## eval-asr-der: run the ASR/DER measurement against PriMock57 audio actually
+## present on disk (runs outside Docker, against the host-mapped Postgres
+## port like `make seed`). Needs `make eval-registry` and
+## `make eval-splits DATASET=primock57` to have been run first.
+eval-asr-der:
+	cd python && POSTGRES_HOST=localhost uv run --project eval coda-eval run-primock57-asr
 
 ## openapi-lint: sanity-check openapi/coda-v1.yaml parses as YAML with the
 ## expected top-level shape. Not a full OpenAPI schema validator — the spec

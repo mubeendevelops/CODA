@@ -1,0 +1,31 @@
+datasets:
+- name: primock57
+  source_url: https://github.com/babylonhealth/primock57
+  licence: CC-BY-4.0
+  modality: audio_grounded
+  languages:
+  - en
+  intended_use: dev+eval
+  n_items_available_locally: 8
+  n_items_upstream: 57
+  manifest_path: /mnt/46B41F33B41F24C9/7th Semester/Major Project/CODA/data/registry/primock57.manifest.jsonl
+- name: mts_dialog
+  source_url: https://github.com/abachaa/MTS-Dialog
+  licence: CC-BY-4.0
+  modality: text_only
+  languages:
+  - en
+  intended_use: dev
+  n_items_available_locally: 1701
+  n_items_upstream: 1701
+  manifest_path: /mnt/46B41F33B41F24C9/7th Semester/Major Project/CODA/data/registry/mts_dialog.manifest.jsonl
+- name: aci_bench
+  source_url: https://github.com/wyim/aci-bench
+  licence: CC-BY-4.0
+  modality: text_only
+  languages:
+  - en
+  intended_use: dev
+  n_items_available_locally: 207
+  n_items_upstream: 207
+  manifest_path: /mnt/46B41F33B41F24C9/7th Semester/Major Project/CODA/data/registry/aci_bench.manifest.jsonl
