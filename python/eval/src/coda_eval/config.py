@@ -16,6 +16,7 @@ DATA_RAW_DIR = DATA_DIR / "raw"
 DATA_REGISTRY_DIR = DATA_DIR / "registry"
 DATA_SPLITS_DIR = DATA_DIR / "splits"
 DATA_PROCESSED_DIR = DATA_DIR / "processed"
+DATA_GOLD_DIR = DATA_DIR / "gold"
 DATASET_REGISTRY_PATH = DATA_DIR / "registry.yaml"
 DOCS_EVAL_DIR = REPO_ROOT / "docs" / "eval"
 
@@ -52,6 +53,7 @@ class PostgresConfig:
 __all__ = [
     "DATASET_REGISTRY_PATH",
     "DATA_DIR",
+    "DATA_GOLD_DIR",
     "DATA_PROCESSED_DIR",
     "DATA_RAW_DIR",
     "DATA_REGISTRY_DIR",

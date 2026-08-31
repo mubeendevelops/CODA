@@ -6,10 +6,13 @@ Companion documents: `claude_context.md` (project context, decisions), `plan.md`
 `docs/adr/` (one ADR per major decision). This document is normative: where it disagrees with the
 blueprint, this document wins.
 
-Status: specification complete. Implementation: §2 (transport), §4 (state machine) and §5 are
-built (`go/internal/queue`, `go/internal/pipeline`, `go/internal/tasks`); §6 and the Python worker
-side of §2 are not.
-Last updated: 2026-08-29.
+Status: specification complete. Implementation: §2 (transport, including the Python worker side —
+`python/shared`'s `coda_worker_sdk`, running in `asr-service`/`nlp-service`), §4 (state machine),
+§5, and §6's RunConfig interning are built (`go/internal/queue`, `go/internal/pipeline`,
+`go/internal/tasks`, `go/internal/http/jobs_handlers.go`); the GoT-lite reasoning engine itself
+(architecture.md's pipeline stages 4-8, `plan.md` Phase 6) is not — see
+`docs/checkpoint_50.md` for the current, adversarially-verified state of everything else.
+Last updated: 2026-08-30.
 
 ---
 
@@ -90,6 +93,15 @@ refinement, hierarchical distillation into the 8 fields, summary generation, LLM
 
 **Must NOT:** touch audio; perform diarization or ASR; own workflow state; decide retry policy.
 
+Postgres access (claude_context.md decision #66, Phase 4): nlp-service writes
+`llm_cache` (unchanged) **and** `extractions`/`summaries`/`clinical_notes` —
+it is the service that computes those rows, and no other service was ever
+wired to persist them (§5.2/§5.3's tables had no writer before this). It may
+also read `run_configs` by id, which resolves claude_context.md decision
+#58's fetch-by-id gap for this service specifically (asr-service still has
+no such path). It must still never write `jobs`/`job_stages` (the
+orchestrator's exclusive tables) or make retry/workflow decisions.
+
 #### Infrastructure
 
 | Service | Owns | Must NOT |
@@ -117,7 +129,9 @@ asr-service ──┬──► redis (consumer group on stage.asr)
 
 nlp-service ──┬──► redis (consumer group on stage.nlp)
               ├──► minio (read transcript, write graph/candidates/note)
-              ├──► postgres (LLM response cache only)
+              ├──► postgres (LLM response cache; run_configs read;
+              │              extractions/summaries/clinical_notes write —
+              │              decision #66)
               └──► Groq chat API (multiple model buckets)
 ```
 
@@ -595,9 +609,9 @@ message RunConfig {
   uint32 schema_version         = 2;
 
   // Models — pinned per role, never inherited from env at runtime
-  string base_model             = 3;   // system under test, e.g. llama-3.3-70b-versatile
+  string base_model             = 3;   // system under test, e.g. qwen/qwen3.8-27b (decision #71)
   string judge_model            = 4;   // e.g. openai/gpt-oss-20b
-  string structural_model       = 5;   // e.g. llama-3.1-8b-instant
+  string structural_model       = 5;   // e.g. qwen/qwen3.6-27b (decision #71)
   string embed_model            = 6;   // e.g. all-MiniLM-L6-v2
   string asr_backend            = 7;   // groq | faster_whisper_local
   string asr_model              = 8;

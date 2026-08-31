@@ -68,6 +68,41 @@ class StorageConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class PostgresConfig:
+    """Postgres connection config for a Python worker with real DB access
+    (currently nlp-service only — claude_context.md decision #66 extends its
+    scope beyond `llm_cache` to `extractions`/`summaries`/`clinical_notes`).
+
+    Same env var names as go/internal/config.LoadDB() and coda_eval's own
+    PostgresConfig, container-network defaults (POSTGRES_HOST=postgres, not
+    localhost) since a worker runs inside Compose, unlike coda_eval's
+    host-side CLI invocation.
+    """
+
+    host: str
+    port: int
+    user: str
+    password: str
+    database: str
+
+    @classmethod
+    def from_env(cls) -> PostgresConfig:
+        return cls(
+            host=_require("POSTGRES_HOST"),
+            port=int(_get("POSTGRES_PORT", "5432")),
+            user=_require("POSTGRES_USER"),
+            password=_require("POSTGRES_PASSWORD"),
+            database=_require("POSTGRES_DB"),
+        )
+
+    def dsn(self) -> str:
+        return (
+            f"host={self.host} port={self.port} user={self.user} "
+            f"password={self.password} dbname={self.database}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ServiceConfig:
     """Process-level configuration shared by every worker entrypoint."""
 

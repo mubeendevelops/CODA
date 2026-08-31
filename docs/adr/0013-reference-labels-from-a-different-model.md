@@ -3,6 +3,10 @@
 - **Status:** Accepted
 - **Date:** 2026-08-27
 - **Related:** ADR-0012, decision #3
+- **Amended 2026-08-30 (claude_context.md decision #71):** `llama-3.3-70b-versatile` (the system
+  under test named below) was removed from Groq's served model list entirely; the system under test
+  is now `qwen/qwen3.8-27b`. `openai/gpt-oss-120b` remains the reference-label model — still a
+  different model, so this ADR's core guarantee is unaffected.
 
 ## Context
 

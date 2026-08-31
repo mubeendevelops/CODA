@@ -45,7 +45,11 @@ var knownArms = map[string]func() *codev1.RunConfig{
 const defaultArm = "baseline"
 
 // baseRunConfig fills in the LLM model assignment from claude_context.md
-// §4 and the GoT knobs for one ablation-matrix row (§6.2). Scorer weights,
+// §4 and the GoT knobs for one ablation-matrix row (§6.2). BaseModel/
+// StructuralModel are qwen/qwen3.8-27b and qwen/qwen3.6-27b, not the
+// llama-3.3-70b-versatile/llama-3.1-8b-instant originally pinned here —
+// both were removed from Groq's served model list entirely (decision #71).
+// Scorer weights,
 // temperature/top_p/seed are placeholder defaults pending Phase 6 tuning —
 // they are still recorded so content_hash is fully reproducible from this
 // object alone (ADR-0012), not left implicit.
@@ -55,13 +59,22 @@ func baseRunConfig(arm string, gotEnabled bool, nCandidates, kIterations uint32,
 		kgBackend = "scispacy_mesh" // primary backend, decision #9/ADR-0010
 	}
 	return &codev1.RunConfig{
-		Arm:                 arm,
-		SchemaVersion:       1,
-		BaseModel:           "llama-3.3-70b-versatile",
-		JudgeModel:          "openai/gpt-oss-20b",
-		StructuralModel:     "llama-3.1-8b-instant",
-		EmbedModel:          "all-MiniLM-L6-v2",
-		AsrBackend:          "groq",
+		Arm:             arm,
+		SchemaVersion:   1,
+		BaseModel:       "qwen/qwen3.8-27b",
+		JudgeModel:      "openai/gpt-oss-20b",
+		StructuralModel: "qwen/qwen3.6-27b",
+		EmbedModel:      "all-MiniLM-L6-v2",
+		// "faster_whisper_local", not "groq": decision #55 is that Groq
+		// whisper is not wired up at all — asr-service only ever runs
+		// faster-whisper. This field feeds
+		// queue.PolicyOptionsFor(...).LocalASR, which selects a 20-minute
+		// ASR soft deadline for local vs. 5 minutes for hosted-Groq-latency
+		// assumptions; leaving this as "groq" silently gave every real job
+		// a 5-minute deadline for CPU transcription that routinely takes
+		// 9+ minutes on real consultation-length audio — found live, this
+		// dead-lettered a genuinely healthy job after 3 doomed attempts.
+		AsrBackend:          "faster_whisper_local",
 		AsrModel:            "whisper-large-v3-turbo",
 		GotEnabled:          gotEnabled,
 		NCandidates:         nCandidates,
@@ -82,10 +95,34 @@ func baseRunConfig(arm string, gotEnabled bool, nCandidates, kIterations uint32,
 // content_hash = sha256(canonical_json(RunConfig)). protojson is the
 // project's one canonical JSON encoding for proto messages (ADR-0004); the
 // same bytes are what gets persisted into run_configs.config.
+//
+// protojson.Marshal's own output is NOT guaranteed byte-stable across calls
+// for an identical logical message — Go's protojson package documents this
+// explicitly, and it was confirmed live in this codebase: two RunConfigs
+// with identical field values produced different marshaled bytes (and
+// therefore different content_hash / different interned rows) on separate
+// calls. That silently broke ADR-0012's entire point — content-hash
+// interning so identical arms share one row and every reported number is
+// reconstructible — every job was getting its own uninterned run_config row
+// regardless of whether an identical one already existed. Re-marshaling
+// through encoding/json (which sorts map keys deterministically, per its
+// own documented guarantee) canonicalizes the bytes actually hashed and
+// stored, without changing protojson's proto-specific encoding rules
+// (enum-as-string, field name casing) that produced them in the first
+// place — canonicalization is a second pass over protojson's already-valid
+// output, not a replacement for it.
 func runConfigContentHash(cfg *codev1.RunConfig) (hash string, canonicalJSON []byte, err error) {
-	b, err := protojson.MarshalOptions{}.Marshal(cfg)
+	raw, err := protojson.MarshalOptions{}.Marshal(cfg)
 	if err != nil {
 		return "", nil, err
+	}
+	var generic any
+	if err := json.Unmarshal(raw, &generic); err != nil {
+		return "", nil, fmt.Errorf("canonicalize run config: %w", err)
+	}
+	b, err := json.Marshal(generic)
+	if err != nil {
+		return "", nil, fmt.Errorf("canonicalize run config: %w", err)
 	}
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:]), b, nil
@@ -93,14 +130,6 @@ func runConfigContentHash(cfg *codev1.RunConfig) (hash string, canonicalJSON []b
 
 type createJobRequest struct {
 	Arm string `json:"arm"`
-}
-
-type createJobResponse struct {
-	JobID          uuid.UUID `json:"job_id"`
-	ConsultationID uuid.UUID `json:"consultation_id"`
-	RunConfigID    uuid.UUID `json:"run_config_id"`
-	Arm            string    `json:"arm"`
-	State          string    `json:"state"`
 }
 
 // CreateJob enqueues one pipeline run for a consultation. It never blocks
@@ -200,10 +229,11 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	if _, err := h.queries.UpdateJobState(r.Context(), sqlc.UpdateJobStateParams{
+	updatedJob, err := h.queries.UpdateJobState(r.Context(), sqlc.UpdateJobStateParams{
 		ID:    job.ID,
 		State: "asr_queued",
-	}); err != nil {
+	})
+	if err != nil {
 		h.logger.ErrorContext(r.Context(), "create job: advance job state", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
@@ -223,9 +253,9 @@ func (h *Handlers) CreateJob(w http.ResponseWriter, r *http.Request) {
 	audit.SetResource(r.Context(), "job", job.ID.String())
 	audit.SetAction(r.Context(), "job.create")
 
-	writeJSON(w, http.StatusAccepted, createJobResponse{
-		JobID: job.ID, ConsultationID: c.ID, RunConfigID: runConfig.ID, Arm: cfg.Arm, State: "asr_queued",
-	})
+	// No stages exist yet at creation time — go-orchestrator lands the
+	// first job_stages row once it picks the job up.
+	writeJSON(w, http.StatusAccepted, buildJobResponse(updatedJob, nil))
 }
 
 type jobStageResponse struct {
@@ -415,7 +445,26 @@ func (h *Handlers) JobEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 
-	ctx, cancel := context.WithTimeout(r.Context(), sseMaxDuration)
+	// r.Context() already carries a deadline from the router's blanket
+	// middleware.Timeout(ServerCfg.RequestTimeout) (30s by default) — a
+	// generic per-request budget meant for ordinary bounded REST calls,
+	// applied to every route including this one. A child context.WithTimeout
+	// can only ever produce the EARLIER of two deadlines, so without
+	// stripping that inherited one first, this handler's own, intentional
+	// 30-*minute* sseMaxDuration was silently clamped to 30 *seconds* —
+	// found live: any job whose stage genuinely took longer than 30s (i.e.
+	// almost any real one) had its SSE stream cleanly closed by the server
+	// mid-job, which the client (lib/sse.ts) then treated as "job reached a
+	// terminal state, nothing more to do" and never reconnected — freezing
+	// the UI at whatever the last-received frame was, indefinitely. This is
+	// the actual root cause the earlier worker-side fixes (self-reclaim
+	// threshold, job_stages job_id reassignment) did not address.
+	// context.WithoutCancel keeps r.Context()'s *values* (claims, request
+	// ID) while dropping its cancellation/deadline; a client that actually
+	// disconnects is still detected the ordinary way any streaming HTTP
+	// handler detects one — via a failed Write/Flush below (emit() and the
+	// heartbeat branch both already return on that), not via ctx.Done().
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), sseMaxDuration)
 	defer cancel()
 
 	pollTicker := time.NewTicker(ssePollInterval)
@@ -617,6 +666,95 @@ func (h *Handlers) GetConsultationResult(w http.ResponseWriter, r *http.Request)
 	audit.MarkClinicalRead(r.Context())
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+type transcriptPresignResponse struct {
+	DownloadURL string    `json:"download_url"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+const transcriptPresignExpiry = 15 * time.Minute
+
+// PresignConsultationTranscript returns a time-limited MinIO GET URL for
+// the consultation's transcript artifact — the download-side mirror of
+// PresignConsultationAudio's upload URL, for the same reason: go-api must
+// never stream artifact bytes through itself (docs/architecture.md §1.2).
+// The frontend fetches this URL directly from MinIO and parses the
+// protojson-encoded Transcript message (proto/coda/v1/transcript.proto)
+// itself; go-api never reads the turns.
+func (h *Handlers) PresignConsultationTranscript(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	if h.storage == nil {
+		writeError(w, http.StatusServiceUnavailable, "object storage is not configured")
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid consultation id")
+		return
+	}
+	c, err := h.queries.GetConsultation(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
+		h.logger.ErrorContext(r.Context(), "presign transcript: get consultation", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if !auth.RequireSameOrg(w, claims, c.OrgID) {
+		return
+	}
+
+	jobs, err := h.queries.ListJobsByConsultation(r.Context(), c.ID)
+	if err != nil {
+		h.logger.ErrorContext(r.Context(), "presign transcript: list jobs", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	if len(jobs) == 0 {
+		writeError(w, http.StatusConflict, "processing has not started for this consultation")
+		return
+	}
+	job := jobs[len(jobs)-1]
+	if !resultReadyStates[job.State] {
+		writeError(w, http.StatusConflict, fmt.Sprintf("still processing (job state: %s)", job.State))
+		return
+	}
+
+	t, err := h.queries.GetTranscriptForConsultationAndRunConfig(r.Context(), sqlc.GetTranscriptForConsultationAndRunConfigParams{
+		ConsultationID: c.ID, RunConfigID: job.RunConfigID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusConflict, "still processing — no transcript persisted yet")
+			return
+		}
+		h.logger.ErrorContext(r.Context(), "presign transcript: get transcript", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	downloadURL, err := h.storage.PresignGetObject(r.Context(), t.Uri, transcriptPresignExpiry)
+	if err != nil {
+		h.logger.ErrorContext(r.Context(), "presign transcript: presign get object", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	audit.SetResource(r.Context(), "consultation", c.ID.String())
+	audit.SetAction(r.Context(), "consultation.transcript.presign")
+	audit.MarkClinicalRead(r.Context())
+
+	writeJSON(w, http.StatusOK, transcriptPresignResponse{
+		DownloadURL: downloadURL.String(),
+		ExpiresAt:   time.Now().Add(transcriptPresignExpiry),
+	})
 }
 
 type cancelConsultationResponse struct {

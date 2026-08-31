@@ -168,9 +168,9 @@ def submit_job(token: str, consultation_id: str) -> str:
     status, resp = _request(
         "POST", f"/consultations/{consultation_id}/jobs", token=token, body={"arm": "baseline"}
     )
-    if status != 202 or not isinstance(resp, dict) or "job_id" not in resp:
+    if status != 202 or not isinstance(resp, dict) or "id" not in resp:
         raise SmokeTestError(f"submit job failed: {status} {resp!r}")
-    return resp["job_id"]
+    return resp["id"]
 
 
 def poll_job(token: str, job_id: str) -> dict:

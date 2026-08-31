@@ -9,7 +9,7 @@ depend on either of them.
 
 from __future__ import annotations
 
-from coda_worker_sdk.config import RedisConfig, ServiceConfig, StorageConfig
+from coda_worker_sdk.config import PostgresConfig, RedisConfig, ServiceConfig, StorageConfig
 from coda_worker_sdk.consumer import ConsumedMessage, StreamConsumer
 from coda_worker_sdk.errors import (
     CancelledSignal,
@@ -20,10 +20,13 @@ from coda_worker_sdk.errors import (
 )
 from coda_worker_sdk.heartbeat import Heartbeater
 from coda_worker_sdk.logging import configure_logging, current_trace_id, trace_context
+from coda_worker_sdk.postgres import PostgresPool
 from coda_worker_sdk.storage import ArtifactKey, StorageClient
 from coda_worker_sdk.worker import StageContext, StageHandler, StageOutput, StageWorker
 
 __all__ = [
+    "PostgresConfig",
+    "PostgresPool",
     "RedisConfig",
     "ServiceConfig",
     "StorageConfig",

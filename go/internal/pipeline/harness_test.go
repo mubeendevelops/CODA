@@ -209,8 +209,8 @@ func (h *harness) runConfig(t *testing.T, arm string, gotEnabled bool) *sqlc.Run
 	t.Helper()
 	cfg := &codev1.RunConfig{
 		Arm: arm, SchemaVersion: 1,
-		BaseModel: "llama-3.3-70b-versatile", JudgeModel: "openai/gpt-oss-20b",
-		StructuralModel: "llama-3.1-8b-instant", EmbedModel: "all-MiniLM-L6-v2",
+		BaseModel: "qwen/qwen3.8-27b", JudgeModel: "openai/gpt-oss-20b",
+		StructuralModel: "qwen/qwen3.6-27b", EmbedModel: "all-MiniLM-L6-v2",
 		AsrBackend: "groq", AsrModel: "whisper-large-v3-turbo",
 		GotEnabled: gotEnabled, NCandidates: 3, KIterations: 2,
 		GraphContextEnabled: gotEnabled, KgEnabled: false, KgBackend: "none",

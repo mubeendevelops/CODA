@@ -1,0 +1,565 @@
+{
+  "schema_version": 1,
+  "item_id": "primock57:day1_consultation05",
+  "dataset": "primock57",
+  "session_id": "day1_consultation05",
+  "language": "en",
+  "annotator": "claude-sonnet-5 (first-pass, decision #3)",
+  "annotated_at": "2026-08-30T08:14:14.514119+00:00",
+  "n_turns": 116,
+  "speakers": [
+    {
+      "turn_id": 0,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 2,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 4,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 6,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 8,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 10,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 12,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 14,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 16,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 18,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 20,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 22,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 24,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 26,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 28,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 29,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 30,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 32,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 34,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 35,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 36,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 37,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 38,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 39,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 40,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 41,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 42,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 44,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 45,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 46,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 47,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 48,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 49,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 50,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 51,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 52,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 53,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 54,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 55,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 56,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 57,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 58,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 59,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 60,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 61,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 62,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 63,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 64,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 65,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 66,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 67,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 68,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 69,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 70,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 71,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 72,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 73,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 74,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 75,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 76,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 77,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 78,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 79,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 80,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 81,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 82,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 83,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 84,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 85,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 86,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 87,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 88,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 89,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 90,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 91,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 92,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 93,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 94,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 95,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 96,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 97,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 98,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 99,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 100,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 101,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 102,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 103,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 104,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 105,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 106,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 107,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 108,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 109,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 110,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 111,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 112,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 113,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 114,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 115,
+      "speaker": "Doctor"
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "lower abdominal pain and feeling hot and sweaty for two days",
+      "source_turn_ids": [
+        4,
+        5
+      ]
+    },
+    "hopi": {
+      "value": "2-day history of burning suprapubic/lower abdominal pain, gradual onset, constant and worsening, not radiating; mild constipation last week, now resolved; no diarrhea; pink-tinged urine noted, no dysuria; increased urinary frequency (also drinking more fluids); mild nausea, no vomiting; subjective fever, not measured; sexually active with a regular partner, last intercourse 4 days ago; last STD screen normal 6 months ago; uses Implanon for contraception; last menstrual period about 2 weeks ago",
+      "source_turn_ids": [
+        4,
+        5,
+        7,
+        9,
+        10,
+        12,
+        14,
+        18,
+        21,
+        22,
+        26,
+        27,
+        32,
+        35,
+        36,
+        37,
+        40,
+        41,
+        44,
+        45,
+        48,
+        49
+      ]
+    },
+    "examination_findings": null,
+    "treatment_plan": {
+      "value": "empirical antibiotics for UTI (Trimethoprim, one tablet twice daily for 3 days), paracetamol for pain, plenty of fluids, cranberry juice, review in a few days if not improving or worsening",
+      "source_turn_ids": [
+        98,
+        99,
+        103,
+        104,
+        105,
+        106,
+        108,
+        109
+      ]
+    },
+    "past_medical_history": [],
+    "medications": [
+      {
+        "value": "Implanon (contraceptive implant)",
+        "source_turn_ids": [
+          44,
+          45
+        ]
+      }
+    ],
+    "allergies": [],
+    "provisional_diagnosis": [
+      {
+        "value": "urinary tract infection (UTI)",
+        "source_turn_ids": [
+          92,
+          93
+        ]
+      },
+      {
+        "value": "pregnancy to be excluded",
+        "source_turn_ids": [
+          93,
+          99
+        ]
+      }
+    ],
+    "investigations_advised": [
+      {
+        "value": "pregnancy test",
+        "source_turn_ids": [
+          52,
+          53,
+          99,
+          100
+        ]
+      }
+    ]
+  },
+  "summary": "Patient presents with a 2-day history of burning lower abdominal/suprapubic pain, pink-tinged urine without dysuria, increased urinary frequency, mild nausea, and subjective fever. She is sexually active with a regular partner and uses Implanon for contraception; last menstrual period was two weeks prior. No significant past medical history. Working diagnosis of a urinary tract infection, with pregnancy to be excluded via testing. Treated empirically with antibiotics (Trimethoprim) alongside analgesia and fluids, with a pregnancy test arranged and review planned if symptoms persist or worsen."
+}

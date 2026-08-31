@@ -292,6 +292,30 @@ paths:
           description: Still processing — no job exists yet, the job hasn't reached awaiting_review, or the note hasn't been persisted yet.
           content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
 
+  /consultations/{id}/transcript:
+    parameters:
+      - { $ref: "#/components/parameters/ConsultationId" }
+    get:
+      operationId: presignConsultationTranscript
+      summary: >
+        Time-limited MinIO GET URL for the transcript artifact — the
+        download-side mirror of the audio upload presign endpoint. go-api
+        never reads the artifact bytes itself (docs/architecture.md §1.2);
+        the caller fetches `download_url` directly from MinIO and parses the
+        protojson-encoded `Transcript` message (proto/coda/v1/
+        transcript.proto: `turns[]`, each `{ turn_index, speaker_label,
+        start_ms, end_ms, text, text_redacted, confidence, words[] }`).
+        admin | doctor | reviewer.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TranscriptPresignResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Still processing — no job exists yet, the job hasn't reached awaiting_review, or no transcript has been persisted yet.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "503": { description: Object storage is not configured on this deployment. }
+
   /jobs/{id}:
     parameters:
       - { $ref: "#/components/parameters/JobId" }
@@ -547,6 +571,87 @@ components:
           nullable: true
           description: When the latest heartbeat arrived. Null before the first one.
 
+    TranscriptPresignResponse:
+      type: object
+      properties:
+        download_url: { type: string, format: uri }
+        expires_at: { type: string, format: date-time }
+
+    Word:
+      type: object
+      properties:
+        text: { type: string }
+        start_ms: { type: integer }
+        end_ms: { type: integer }
+        confidence: { type: number, format: float }
+        speaker_cluster_id: { type: string }
+
+    Turn:
+      type: object
+      description: >
+        One speaker-labeled, timestamped utterance
+        (proto/coda/v1/transcript.proto). Fetched via the presigned URL
+        from `GET /consultations/{id}/transcript`, never inline in any
+        go-api response.
+      properties:
+        turn_index: { type: integer }
+        speaker_label: { type: string, enum: [SPEAKER_ROLE_UNSPECIFIED, SPEAKER_ROLE_DOCTOR, SPEAKER_ROLE_PATIENT, SPEAKER_ROLE_UNKNOWN] }
+        start_ms: { type: integer }
+        end_ms: { type: integer }
+        text: { type: string, description: Original text. Only text_redacted ever reached an LLM prompt (ADR-0014), but both are shown to an authenticated reviewer here. }
+        text_redacted: { type: string }
+        confidence: { type: number, format: float }
+        words: { type: array, items: { $ref: "#/components/schemas/Word" } }
+
+    TranscriptArtifact:
+      type: object
+      description: The shape of the JSON blob at TranscriptPresignResponse.download_url — not returned by any go-api endpoint directly.
+      properties:
+        consultation_id: { type: string }
+        run_config_id: { type: string }
+        language: { type: string }
+        asr_backend: { type: string }
+        asr_model: { type: string }
+        turns: { type: array, items: { $ref: "#/components/schemas/Turn" } }
+        wer: { type: number, nullable: true }
+        der: { type: number, nullable: true }
+
+    FieldValue:
+      type: object
+      description: One extracted field's value with provenance (claude_context.md §3). A field with nothing stated is omitted entirely by protojson, not present as null — treat a missing key the same as "not stated".
+      properties:
+        value: { type: string }
+        source_turn_ids: { type: array, items: { type: integer } }
+        confidence: { type: number, format: float }
+        linked_concepts: { type: array, items: { type: string } }
+
+    ClinicalNote:
+      type: object
+      description: >
+        The 8-field JSON note (proto/coda/v1/clinical.proto), protojson-
+        encoded with preserving_proto_field_name — the exact shape of
+        ConsultationResult.clinical_note. Any field/list may be entirely
+        absent (not stated), never fabricated.
+      properties:
+        consultation_id: { type: string }
+        run_config_id: { type: string }
+        version: { type: integer }
+        status: { type: string, enum: [NOTE_STATUS_UNSPECIFIED, NOTE_STATUS_DRAFT, NOTE_STATUS_UNDER_REVIEW, NOTE_STATUS_APPROVED] }
+        chief_complaint: { $ref: "#/components/schemas/FieldValue" }
+        hopi: { $ref: "#/components/schemas/FieldValue" }
+        past_medical_history: { type: array, items: { $ref: "#/components/schemas/FieldValue" } }
+        medications_allergies:
+          type: object
+          properties:
+            medications: { type: array, items: { $ref: "#/components/schemas/FieldValue" } }
+            allergies: { type: array, items: { $ref: "#/components/schemas/FieldValue" } }
+        examination_findings: { $ref: "#/components/schemas/FieldValue" }
+        provisional_diagnosis: { type: array, items: { $ref: "#/components/schemas/FieldValue" } }
+        investigations_advised: { type: array, items: { $ref: "#/components/schemas/FieldValue" } }
+        treatment_plan: { $ref: "#/components/schemas/FieldValue" }
+        approved_by: { type: string }
+        approved_at: { type: string }
+
     ConsultationResult:
       type: object
       properties:
@@ -569,9 +674,8 @@ components:
           nullable: true
           properties: { text: { type: string } }
         clinical_note:
-          type: object
           nullable: true
-          description: The 8-field JSON note (claude_context.md §3), each field carrying { value, source_turn_ids[], confidence }.
+          allOf: [{ $ref: "#/components/schemas/ClinicalNote" }]
         artifacts:
           type: array
           items:

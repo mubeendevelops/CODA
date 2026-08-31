@@ -26,7 +26,6 @@ from asr_service.transcribe import transcribe
 from coda.v1 import common_pb2, transcript_pb2
 from coda_worker_sdk import StageContext, StageHandler, StageOutput
 from coda_worker_sdk.errors import FatalError
-from coda_worker_sdk.storage import parse_artifact_key
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,17 @@ def build_asr_handler(bundle: ModelBundle) -> StageHandler:
             extra={"extra_fields": {"job_id": env.job_id, "payload_ref": env.payload_ref}},
         )
 
-        key = parse_artifact_key(env.payload_ref)
+        # STAGE_ASR's payload_ref is the consultation's source audio key
+        # (go/internal/storage/key.go SourceAudioKey:
+        # {env}/consultations/{id}/source/audio/{sha256}.{ext}), not a §3.3
+        # stage-output key — parse_artifact_key doesn't apply here, only the
+        # basename extension is needed.
+        if "." not in env.payload_ref:
+            raise FatalError(
+                f"STAGE_ASR payload_ref {env.payload_ref!r} has no extension",
+                code="MISSING_PAYLOAD",
+            )
+        ext = env.payload_ref.rpartition(".")[-1]
 
         ctx.heartbeat.update(percent=5, step="downloading audio")
         buf = io.BytesIO()
@@ -67,7 +76,7 @@ def build_asr_handler(bundle: ModelBundle) -> StageHandler:
         ctx.heartbeat.update(percent=15, step="preprocessing audio")
         audio = preprocess(
             raw,
-            ext=key.ext,
+            ext=ext,
             target_loudness_dbfs=cfg.target_loudness_dbfs,
             min_duration_s=cfg.min_audio_duration_s,
             max_duration_s=cfg.max_audio_duration_s,

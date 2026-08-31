@@ -109,9 +109,20 @@ func (o *Orchestrator) dispatchJob(ctx context.Context, jobID uuid.UUID) error {
 		// therefore comes from the existing job_stages row for this work
 		// unit, not from jobs.attempt — which mirrors the current stage's
 		// count so GET /v1/jobs/{id} can display it without a join.
+		//
+		// That row is keyed by idempotency_key, not job_id — RunConfig
+		// interning (ADR-0012) means a DIFFERENT job (a resubmit after this
+		// consultation's prior job dead-lettered or failed without this
+		// stage ever succeeding) can land on the exact same key. Continuing
+		// prev.Attempt+1 in that case would hand the new job its
+		// predecessor's already-exhausted attempt budget, dead-lettering it
+		// before it ever ran — this is that job's own first attempt at this
+		// stage, regardless of what the row's previous owner used up.
 		attempt := int32(1)
 		if prev, err := q.GetJobStageByIdempotencyKey(ctx, key); err == nil {
-			attempt = prev.Attempt + 1
+			if prev.JobID == job.ID {
+				attempt = prev.Attempt + 1
+			}
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("pipeline: read prior attempt for stage %s: %w", stageName(stage), err)
 		}

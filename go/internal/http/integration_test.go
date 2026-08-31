@@ -822,12 +822,9 @@ func TestIntegration_CreateJob(t *testing.T) {
 			b, _ := io.ReadAll(resp.Body)
 			t.Fatalf("status = %d, want 202: %s", resp.StatusCode, b)
 		}
-		job := decodeJSON[createJobResponse](t, resp)
-		if job.JobID == uuid.Nil {
+		job := decodeJSON[jobResponse](t, resp)
+		if job.ID == uuid.Nil {
 			t.Error("expected a non-nil job id")
-		}
-		if job.Arm != "baseline" {
-			t.Errorf("arm = %q, want baseline (the default)", job.Arm)
 		}
 		if job.State != "asr_queued" {
 			t.Errorf("state = %q, want asr_queued", job.State)
@@ -847,10 +844,10 @@ func TestIntegration_GetJob(t *testing.T) {
 	consult := mustCreateConsultation(t, env, orgA.ID, doctorA.ID, "en")
 	mustUploadAudio(t, env, tokensA.AccessToken, consult.ID)
 	createResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokensA.AccessToken, nil)
-	job := decodeJSON[createJobResponse](t, createResp)
+	job := decodeJSON[jobResponse](t, createResp)
 
 	t.Run("owning org can read job status with stage detail", func(t *testing.T) {
-		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.JobID.String(), tokensA.AccessToken, nil)
+		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.ID.String(), tokensA.AccessToken, nil)
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("status = %d, want 200", resp.StatusCode)
 		}
@@ -864,7 +861,7 @@ func TestIntegration_GetJob(t *testing.T) {
 	})
 
 	t.Run("a different org cannot read this job", func(t *testing.T) {
-		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.JobID.String(), tokensB.AccessToken, nil)
+		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.ID.String(), tokensB.AccessToken, nil)
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("status = %d, want 404", resp.StatusCode)
 		}
@@ -890,10 +887,10 @@ func TestIntegration_JobEvents(t *testing.T) {
 	consult := mustCreateConsultation(t, env, orgA.ID, doctorA.ID, "en")
 	mustUploadAudio(t, env, tokensA.AccessToken, consult.ID)
 	createResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokensA.AccessToken, nil)
-	job := decodeJSON[createJobResponse](t, createResp)
+	job := decodeJSON[jobResponse](t, createResp)
 
 	t.Run("a different org gets 404, not a stream", func(t *testing.T) {
-		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.JobID.String()+"/events", tokensB.AccessToken, nil)
+		resp := env.doJSON(t, http.MethodGet, "/v1/jobs/"+job.ID.String()+"/events", tokensB.AccessToken, nil)
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("status = %d, want 404", resp.StatusCode)
 		}
@@ -902,7 +899,7 @@ func TestIntegration_JobEvents(t *testing.T) {
 	t.Run("connecting streams an initial SSE frame with the current state", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(env.ctx, 5*time.Second)
 		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, env.server.URL+"/v1/jobs/"+job.JobID.String()+"/events", nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, env.server.URL+"/v1/jobs/"+job.ID.String()+"/events", nil)
 		if err != nil {
 			t.Fatalf("build request: %v", err)
 		}
@@ -952,7 +949,7 @@ func TestIntegration_ConsultationResult(t *testing.T) {
 
 	mustUploadAudio(t, env, tokens.AccessToken, consult.ID)
 	createResp := env.doJSON(t, http.MethodPost, "/v1/consultations/"+consult.ID.String()+"/jobs", tokens.AccessToken, nil)
-	job := decodeJSON[createJobResponse](t, createResp)
+	job := decodeJSON[jobResponse](t, createResp)
 
 	t.Run("409 while the job is still processing", func(t *testing.T) {
 		resp := env.doJSON(t, http.MethodGet, "/v1/consultations/"+consult.ID.String()+"/result", tokens.AccessToken, nil)
@@ -965,7 +962,7 @@ func TestIntegration_ConsultationResult(t *testing.T) {
 	// orchestrator yet (plan.md Phase 3), so the test drives the DB
 	// directly to the point GetConsultationResult expects, the same way a
 	// completed worker eventually will.
-	if _, err := env.queries.UpdateJobState(env.ctx, sqlc.UpdateJobStateParams{ID: job.JobID, State: "awaiting_review"}); err != nil {
+	if _, err := env.queries.UpdateJobState(env.ctx, sqlc.UpdateJobStateParams{ID: job.ID, State: "awaiting_review"}); err != nil {
 		t.Fatalf("advance job state: %v", err)
 	}
 	noteJSON := []byte(`{"chief_complaint":{"value":"cough","source_turn_ids":[1],"confidence":0.9}}`)
@@ -982,8 +979,8 @@ func TestIntegration_ConsultationResult(t *testing.T) {
 			t.Fatalf("status = %d, want 200: %s", resp.StatusCode, b)
 		}
 		got := decodeJSON[consultationResultResponse](t, resp)
-		if got.JobID != job.JobID {
-			t.Errorf("job_id = %v, want %v", got.JobID, job.JobID)
+		if got.JobID != job.ID {
+			t.Errorf("job_id = %v, want %v", got.JobID, job.ID)
 		}
 		if len(got.ClinicalNote) == 0 {
 			t.Error("expected a non-empty clinical_note")

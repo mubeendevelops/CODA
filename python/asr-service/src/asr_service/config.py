@@ -47,7 +47,9 @@ class AsrConfig:
     groq_api_key: str
     """Required for the few-shot Doctor/Patient role classifier."""
     role_model: str
-    """Groq model id used for role classification, e.g. llama-3.1-8b-instant."""
+    """Groq model id used for role classification, e.g. qwen/qwen3.6-27b
+    (llama-3.1-8b-instant, originally pinned here, was removed from Groq's
+    served model list entirely — decision #71)."""
     role_confidence_threshold: float
     """Below this, a role assignment is still recorded but flagged uncertain
     (logged + surfaced via SpeakerCluster.confidence) rather than trusted."""
@@ -75,7 +77,7 @@ class AsrConfig:
             hf_token=hf_token,
             diarization_model=_get("ASR_DIARIZATION_MODEL", "pyannote/speaker-diarization-3.1"),
             groq_api_key=groq_api_key,
-            role_model=_get("ASR_ROLE_MODEL", "llama-3.1-8b-instant"),
+            role_model=_get("ASR_ROLE_MODEL", "qwen/qwen3.6-27b"),
             role_confidence_threshold=float(_get("ASR_ROLE_CONFIDENCE_THRESHOLD", "0.6")),
             chunk_length_s=float(_get("ASR_CHUNK_LENGTH_S", "300")),
             chunk_overlap_s=float(_get("ASR_CHUNK_OVERLAP_S", "5")),

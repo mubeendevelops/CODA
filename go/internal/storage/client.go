@@ -13,18 +13,37 @@ import (
 )
 
 // Client wraps the MinIO SDK behind the narrow set of operations go-api
-// needs: presigned uploads, existence/size checks, and deletion — never
-// streaming object bytes through go-api itself (docs/architecture.md §1.2:
-// go-api must not run ML or hold pipeline data in memory; large objects
-// move directly between the browser and MinIO via presigned URLs).
+// needs: presigned uploads and downloads, existence/size checks, and
+// deletion — never streaming object bytes through go-api itself
+// (docs/architecture.md §1.2: go-api must not run ML or hold pipeline data
+// in memory; objects move directly between the browser and MinIO via
+// presigned URLs in both directions, upload and download alike).
 type Client struct {
-	mc     *minio.Client
-	Bucket string
-	Env    string // artifact key prefix (architecture.md §3.3), e.g. "dev"
+	mc       *minio.Client // Docker-network endpoint — go-api's own direct calls
+	presigns *minio.Client // browser-reachable endpoint — presigned URL generation only
+	Bucket   string
+	Env      string // artifact key prefix (architecture.md §3.3), e.g. "dev"
 }
 
 // NewClient constructs a Client and verifies the target bucket exists,
 // creating it if not — the same "fail fast at startup" posture as db.NewPool.
+//
+// Two minio.Client instances, same credentials, different endpoints
+// (config.Storage's doc comment explains why): `mc` talks to
+// cfg.Endpoint for go-api's own direct calls (StatObject, bucket checks —
+// these need a real, live connection, so they must use the address
+// actually reachable from inside the compose network); `presigns` is
+// constructed against cfg.PublicEndpoint purely to compute presigned-URL
+// signatures. Computing a signature itself needs no live connection to
+// that address — but the SDK's Presigned{Put,Get}Object still calls
+// GetBucketLocation first to learn the bucket's region for the signature,
+// and that call WOULD go out over `presigns`' own (unreachable) endpoint
+// if left to look it up itself. So `presigns` is given an explicit Region,
+// learned via one real GetBucketLocation call over the connection that
+// actually works (`mc`) — discovered empirically: without this, every
+// presigned URL failed with a connection-refused dialing PublicEndpoint
+// from inside the container, since bucket-region lookup isn't a pure
+// offline computation the way the final signature step is.
 func NewClient(ctx context.Context, cfg config.Storage, env string) (*Client, error) {
 	mc, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
@@ -44,7 +63,23 @@ func NewClient(ctx context.Context, cfg config.Storage, env string) (*Client, er
 		}
 	}
 
-	return &Client{mc: mc, Bucket: cfg.Bucket, Env: env}, nil
+	presigns := mc
+	if cfg.PublicEndpoint != cfg.Endpoint {
+		region, err := mc.GetBucketLocation(ctx, cfg.Bucket)
+		if err != nil {
+			return nil, fmt.Errorf("storage: get bucket region for presigning: %w", err)
+		}
+		presigns, err = minio.New(cfg.PublicEndpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+			Secure: cfg.UseSSL,
+			Region: region,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("storage: construct presigning minio client: %w", err)
+		}
+	}
+
+	return &Client{mc: mc, presigns: presigns, Bucket: cfg.Bucket, Env: env}, nil
 }
 
 // PresignPutObject returns a time-limited URL the caller can PUT directly
@@ -54,9 +89,22 @@ func NewClient(ctx context.Context, cfg config.Storage, env string) (*Client, er
 // confirm, since a presigned PUT URL cannot itself enforce the header a
 // client sends.
 func (c *Client) PresignPutObject(ctx context.Context, key string, expiry time.Duration) (*url.URL, error) {
-	u, err := c.mc.PresignedPutObject(ctx, c.Bucket, key, expiry)
+	u, err := c.presigns.PresignedPutObject(ctx, c.Bucket, key, expiry)
 	if err != nil {
 		return nil, fmt.Errorf("storage: presign put %q: %w", key, err)
+	}
+	return u, nil
+}
+
+// PresignGetObject returns a time-limited URL the caller can GET directly
+// from MinIO — the download-side mirror of PresignPutObject, for the same
+// reason: go-api must not stream artifact bytes through itself
+// (docs/architecture.md §1.2). Used to hand the frontend a transcript
+// artifact without go-api ever reading its content server-side.
+func (c *Client) PresignGetObject(ctx context.Context, key string, expiry time.Duration) (*url.URL, error) {
+	u, err := c.presigns.PresignedGetObject(ctx, c.Bucket, key, expiry, url.Values{})
+	if err != nil {
+		return nil, fmt.Errorf("storage: presign get %q: %w", key, err)
 	}
 	return u, nil
 }

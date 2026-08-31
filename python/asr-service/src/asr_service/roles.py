@@ -1,6 +1,7 @@
 """Speaker role assignment: few-shot Groq classification of each diarized
-cluster as Doctor/Patient (claude_context.md §5's llama-3.1-8b-instant
-structural-call bucket), with a confidence score and an explicit uncertain
+cluster as Doctor/Patient (claude_context.md §4's structural-call bucket,
+qwen/qwen3.6-27b as of decision #71 — llama-3.1-8b-instant was removed from
+Groq's served model list), with a confidence score and an explicit uncertain
 flag rather than a forced guess.
 
 Both clusters are classified in one call, not independently — asking the

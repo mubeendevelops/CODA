@@ -1,0 +1,669 @@
+{
+  "schema_version": 1,
+  "item_id": "primock57:day1_consultation03",
+  "dataset": "primock57",
+  "session_id": "day1_consultation03",
+  "language": "en",
+  "annotator": "claude-sonnet-5 (first-pass, decision #3)",
+  "annotated_at": "2026-08-30T08:14:14.512612+00:00",
+  "n_turns": 141,
+  "speakers": [
+    {
+      "turn_id": 0,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 2,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 4,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 6,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 8,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 10,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 12,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 14,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 16,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 18,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 20,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 22,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 24,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 26,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 28,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 29,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 30,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 32,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 34,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 35,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 36,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 37,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 38,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 39,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 40,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 41,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 42,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 44,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 45,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 46,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 47,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 48,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 49,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 50,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 51,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 52,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 53,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 54,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 55,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 56,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 57,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 58,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 59,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 60,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 61,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 62,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 63,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 64,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 65,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 66,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 67,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 68,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 69,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 70,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 71,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 72,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 73,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 74,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 75,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 76,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 77,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 78,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 79,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 80,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 81,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 82,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 83,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 84,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 85,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 86,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 87,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 88,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 89,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 90,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 91,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 92,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 93,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 94,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 95,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 96,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 97,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 98,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 99,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 100,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 101,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 102,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 103,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 104,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 105,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 106,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 107,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 108,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 109,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 110,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 111,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 112,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 113,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 114,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 115,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 116,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 117,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 118,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 119,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 120,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 121,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 122,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 123,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 124,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 125,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 126,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 127,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 128,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 129,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 130,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 131,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 132,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 133,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 134,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 135,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 136,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 137,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 138,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 139,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 140,
+      "speaker": "Doctor"
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "terrible headache since mid-day, on the left side",
+      "source_turn_ids": [
+        3,
+        4
+      ]
+    },
+    "hopi": {
+      "value": "sudden-onset throbbing left-sided headache since midday today, preceded by visual aura (zigzag lines), with blurred vision in both eyes, photophobia, worse on movement/leaning forward, nausea and two episodes of vomiting; no neck stiffness, no speech/limb weakness or numbness, no balance problems, no head injury, no fever, no rash; a similar episode occurred a few weeks ago, lasting a couple of days, resolved with analgesia",
+      "source_turn_ids": [
+        3,
+        4,
+        6,
+        9,
+        16,
+        18,
+        20,
+        22,
+        23,
+        35,
+        37,
+        38,
+        40,
+        41,
+        42,
+        44,
+        45,
+        46,
+        65,
+        66,
+        67,
+        69,
+        70,
+        71,
+        72,
+        75,
+        76
+      ]
+    },
+    "examination_findings": null,
+    "treatment_plan": {
+      "value": "keep a headache diary, regular paracetamol/NSAIDs (ibuprofen/naproxen) for pain, consider prophylactic medication at next review if episodes continue, return earlier if worsening or red-flag symptoms develop",
+      "source_turn_ids": [
+        122,
+        123,
+        124,
+        126,
+        127,
+        130,
+        131,
+        132
+      ]
+    },
+    "past_medical_history": [
+      {
+        "value": "mother has migraines",
+        "source_turn_ids": [
+          79,
+          80
+        ]
+      },
+      {
+        "value": "mother has an underactive thyroid",
+        "source_turn_ids": [
+          84,
+          85
+        ]
+      }
+    ],
+    "medications": [
+      {
+        "value": "Microgynon (contraceptive pill), taking for 3 months",
+        "source_turn_ids": [
+          89,
+          90
+        ]
+      }
+    ],
+    "allergies": [],
+    "provisional_diagnosis": [
+      {
+        "value": "migraine",
+        "source_turn_ids": [
+          115,
+          116,
+          117
+        ]
+      }
+    ],
+    "investigations_advised": []
+  },
+  "summary": "Patient presents with a sudden-onset severe left-sided throbbing headache since midday, preceded by visual aura (zigzag lines), with associated photophobia, blurred vision, nausea and two episodes of vomiting, worse on movement. A similar episode occurred a few weeks prior. Family history of migraine and underactive thyroid (both mother); no other relevant past medical history. On Microgynon for contraception. No red-flag neurological symptoms. Diagnosed as migraine. Advised regular analgesia, a headache diary, and review to discuss prophylaxis if episodes continue, with safety-netting for worsening symptoms."
+}

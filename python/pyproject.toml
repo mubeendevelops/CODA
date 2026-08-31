@@ -24,9 +24,14 @@ strict = true
 warn_unused_ignores = true
 namespace_packages = true
 explicit_package_bases = true
-mypy_path = "coda_proto/src:shared/src:asr-service/src:eval/src"
+mypy_path = "coda_proto/src:shared/src:asr-service/src:nlp-service/src:eval/src"
 
 [[tool.mypy.overrides]]
 # grpcio-health-checking ships no py.typed stubs; types-grpcio doesn't cover it.
 module = "grpc_health.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# rouge-score and bert-score ship no py.typed marker or stub package.
+module = ["rouge_score.*", "bert_score.*"]
 ignore_missing_imports = true

@@ -1,0 +1,614 @@
+{
+  "schema_version": 1,
+  "item_id": "primock57:day1_consultation02",
+  "dataset": "primock57",
+  "session_id": "day1_consultation02",
+  "language": "en",
+  "annotator": "claude-sonnet-5 (first-pass, decision #3)",
+  "annotated_at": "2026-08-30T08:14:14.511829+00:00",
+  "n_turns": 130,
+  "speakers": [
+    {
+      "turn_id": 0,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 2,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 4,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 6,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 8,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 10,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 12,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 14,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 16,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 18,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 20,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 22,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 24,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 26,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 28,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 29,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 30,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 32,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 34,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 35,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 36,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 37,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 38,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 39,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 40,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 41,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 42,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 44,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 45,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 46,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 47,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 48,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 49,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 50,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 51,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 52,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 53,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 54,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 55,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 56,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 57,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 58,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 59,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 60,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 61,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 62,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 63,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 64,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 65,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 66,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 67,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 68,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 69,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 70,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 71,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 72,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 73,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 74,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 75,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 76,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 77,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 78,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 79,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 80,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 81,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 82,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 83,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 84,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 85,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 86,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 87,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 88,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 89,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 90,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 91,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 92,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 93,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 94,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 95,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 96,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 97,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 98,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 99,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 100,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 101,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 102,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 103,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 104,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 105,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 106,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 107,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 108,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 109,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 110,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 111,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 112,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 113,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 114,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 115,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 116,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 117,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 118,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 119,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 120,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 121,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 122,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 123,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 124,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 125,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 126,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 127,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 128,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 129,
+      "speaker": "Doctor"
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "sore, red, itchy skin for a few days",
+      "source_turn_ids": [
+        5
+      ]
+    },
+    "hopi": {
+      "value": "4-day history of dry, itchy, sore skin mainly on the chest, hands and inside the elbows, with some cracking but no bleeding or discharge; tried an OTC steroid cream the night before with minimal effect and antihistamines with no help; previously diagnosed eczema but previously confined to the arms only; no known trigger identified; no fever",
+      "source_turn_ids": [
+        5,
+        8,
+        9,
+        13,
+        19,
+        20,
+        26,
+        27,
+        36,
+        37,
+        40,
+        41,
+        49,
+        50,
+        51,
+        57,
+        58,
+        64,
+        68,
+        76
+      ]
+    },
+    "examination_findings": {
+      "value": "rash affecting chest and back, appearance consistent with an eczema flare on visual (video) inspection",
+      "source_turn_ids": [
+        100,
+        101
+      ]
+    },
+    "treatment_plan": {
+      "value": "stronger prescription steroid cream, regular emollients for bathing/showering over 7-10 days, antihistamines (Fexofenadine), keep a trigger diary, review in about a week if not better",
+      "source_turn_ids": [
+        103,
+        104,
+        107,
+        111,
+        114,
+        120,
+        121,
+        124
+      ]
+    },
+    "past_medical_history": [
+      {
+        "value": "eczema",
+        "source_turn_ids": [
+          13,
+          14
+        ]
+      },
+      {
+        "value": "asthma in the past, resolved",
+        "source_turn_ids": [
+          76,
+          77
+        ]
+      }
+    ],
+    "medications": [],
+    "allergies": [],
+    "provisional_diagnosis": [
+      {
+        "value": "flare-up of eczema",
+        "source_turn_ids": [
+          98,
+          99
+        ]
+      }
+    ],
+    "investigations_advised": []
+  },
+  "summary": "Patient reports a 4-day history of dry, itchy, cracked skin affecting the chest, hands and inside of the elbows, with minimal response to OTC steroid cream and antihistamines. History of eczema (previously confined to the arms) and past asthma. No known allergies. Diagnosed as a flare-up of eczema. Advised a stronger prescription steroid cream, regular emollients, antihistamines, and a trigger diary, with review in one to two weeks if not improving."
+}

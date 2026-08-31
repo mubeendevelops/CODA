@@ -80,6 +80,18 @@ async def _amain() -> None:
         # several jobs concurrently would thrash rather than parallelise.
         concurrency=1,
         batch=2,
+        # Must exceed real worst-case STAGE_ASR wall-clock, or the periodic
+        # reclaim sweep (coda_worker_sdk.consumer.StreamConsumer, 30s cadence)
+        # self-reclaims a message that is still being legitimately handled by
+        # this same in-flight task, dispatching a duplicate run of the same
+        # job the moment the original finishes — and if that duplicate also
+        # exceeds the threshold, the cycle repeats forever, starving every
+        # other queued job (found live: a ~7.6-minute PriMock57 clip took
+        # 569,922ms end-to-end, comfortably over the SDK's 5-minute default).
+        # 40 minutes matches go/internal/queue/policy.go's
+        # PolicyFor(STAGE_ASR, LocalASR).VisibilityTimeout exactly — the two
+        # must not drift independently.
+        min_idle_ms=40 * 60 * 1000,
     )
 
     stop_event = asyncio.Event()

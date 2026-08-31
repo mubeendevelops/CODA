@@ -128,6 +128,8 @@ func NewRouter(d RouterDeps) chi.Router {
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
 			Get("/consultations/{id}/result", h.GetConsultationResult)
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
+			Get("/consultations/{id}/transcript", h.PresignConsultationTranscript)
+		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
 			Get("/jobs/{id}", h.GetJob)
 		r.With(auth.RequireRole(auth.RoleAdmin, auth.RoleDoctor, auth.RoleReviewer)).
 			Get("/jobs/{id}/events", h.JobEvents)

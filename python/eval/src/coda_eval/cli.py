@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from pathlib import Path
 
 import click
 from faster_whisper import WhisperModel  # type: ignore[import-untyped]
@@ -24,8 +25,9 @@ from asr_service.audio import preprocess
 from asr_service.diarize import diarize as run_diarization
 from asr_service.diarize import load_pipeline
 from asr_service.transcribe import transcribe
-from coda_eval import acibench, db, mtsdialog, primock57
+from coda_eval import acibench, baseline_eval, db, gold, mtsdialog, primock57
 from coda_eval.config import (
+    DATA_GOLD_DIR,
     DATA_REGISTRY_DIR,
     DATA_SPLITS_DIR,
     DATASET_REGISTRY_PATH,
@@ -33,9 +35,16 @@ from coda_eval.config import (
     REPO_ROOT,
     PostgresConfig,
 )
+from coda_eval.gold_schema import validate_gold_file
 from coda_eval.metrics.der import DerAccumulator
 from coda_eval.metrics.wer_cer import aggregate_wer_cer, compute_wer_cer
-from coda_eval.registry import DatasetSummary, write_dataset_registry, write_manifest
+from coda_eval.registry import (
+    DatasetSummary,
+    ManifestEntry,
+    read_manifest,
+    write_dataset_registry,
+    write_manifest,
+)
 from coda_eval.report import RunMetadata, SubsetResult, now_utc, write_csv, write_markdown
 from coda_eval.rttm import read_rttm, rttm_to_annotation
 from coda_eval.splits import assert_no_leakage, assign_splits
@@ -122,6 +131,94 @@ def splits(dataset: str) -> None:
     for e in split_entries:
         counts[e.split or "?"] = counts.get(e.split or "?", 0) + 1
     logger.info("splits: %s -> %s (%d entries, no leakage)", dataset, counts, len(split_entries))
+
+
+@main.command(name="gold-scaffold")
+@click.option("--dataset", default=primock57.DATASET_NAME, help="Only primock57 is supported today "
+              "— decision #3b prefers dataset_gold clinician notes, and only primock57 has one.")
+@click.option("--item", "session_id", required=False, help="Session ID (e.g. day1_consultation01). "
+              "Omit with --all to scaffold every item in the dataset's manifest.")
+@click.option("--all", "scaffold_all", is_flag=True)
+@click.option("--annotator", default="claude-sonnet-5", help="Recorded in the gold file's "
+              "`annotator` field — who/what produced this scaffold or first pass.")
+@click.option("--force", is_flag=True, help="Overwrite an existing gold file.")
+def gold_scaffold(
+    dataset: str, session_id: str | None, scaffold_all: bool, annotator: str, force: bool
+) -> None:
+    """Writes an empty-but-valid-shape gold JSON file (docs/eval/annotation_guide.md
+    §6) for one item or every item in the dataset's manifest."""
+    if dataset != primock57.DATASET_NAME:
+        logger.error("gold-scaffold only supports dataset=primock57 today (decision #3b)")
+        sys.exit(1)
+    if not session_id and not scaffold_all:
+        logger.error("pass --item <session_id> or --all")
+        sys.exit(1)
+
+    manifest_path = DATA_REGISTRY_DIR / f"{dataset}.manifest.jsonl"
+    if not manifest_path.exists():
+        logger.error("no manifest at %s — run `coda-eval registry` first", manifest_path)
+        sys.exit(1)
+    entries = {e.session_id: e for e in read_manifest(manifest_path)}
+
+    targets: list[ManifestEntry | None]
+    if scaffold_all:
+        targets = list(entries.values())
+    else:
+        assert session_id is not None  # guaranteed by the check above
+        targets = [entries.get(session_id)]
+    for entry in targets:
+        if entry is None:
+            logger.error("no manifest entry for session_id=%s", session_id)
+            sys.exit(1)
+        out_path = DATA_GOLD_DIR / dataset / f"{entry.session_id}.gold.json"
+        if out_path.exists() and not force:
+            logger.info("skip %s (already exists, pass --force to overwrite)", out_path)
+            continue
+        turns = gold.parse_reference_transcript(Path(entry.reference_transcript_path))  # type: ignore[arg-type]
+        data = gold.scaffold_gold_dict(
+            item_id=entry.item_id,
+            dataset=dataset,
+            session_id=entry.session_id,
+            language=entry.language,
+            annotator=annotator,
+            turns=turns,
+        )
+        gold.write_gold(out_path, data)
+        logger.info("scaffolded %s (%d turns)", out_path, len(turns))
+
+
+@main.command(name="gold-validate")
+@click.argument("path", required=False, type=click.Path(exists=True))
+@click.option(
+    "--all", "validate_all", is_flag=True, help="Validate every *.gold.json under data/gold/."
+)
+def gold_validate(path: str | None, validate_all: bool) -> None:
+    """Validates one gold file or every gold file under data/gold/ against
+    gold_schema.py, reporting every error (not just the first) per file."""
+    if not path and not validate_all:
+        logger.error("pass a PATH or --all")
+        sys.exit(1)
+
+    targets = sorted(DATA_GOLD_DIR.rglob("*.gold.json")) if validate_all else [Path(path)]  # type: ignore[arg-type]
+    if not targets:
+        logger.error("no gold files found under %s", DATA_GOLD_DIR)
+        sys.exit(1)
+
+    n_failed = 0
+    for p in targets:
+        result = validate_gold_file(p)
+        if result.valid:
+            logger.info("OK   %s", p)
+        else:
+            n_failed += 1
+            logger.error("FAIL %s", p)
+            for err in result.errors:
+                logger.error("       %s", err)
+
+    if n_failed:
+        logger.error("%d of %d gold file(s) failed validation", n_failed, len(targets))
+        sys.exit(1)
+    logger.info("%d gold file(s) valid", len(targets))
 
 
 def _reference_words_only(transcript_path: str) -> str:
@@ -322,6 +419,94 @@ def run_primock57_asr(
         "done: WER=%.4f CER=%.4f DER=%s over %d items — report written to docs/eval/",
         aggregate.wer, aggregate.cer, f"{der_agg.der:.4f}" if der_agg else "not computed",
         len(entries),
+    )
+
+
+@main.command(name="run-baseline-eval")
+@click.option(
+    "--limit", type=int, default=None, help="Only process the first N gold-annotated items."
+)
+@click.option(
+    "--base-model", default="qwen/qwen3.8-27b",
+    help="The system-under-test model (decision #71). Must be held constant across baseline "
+    "and every GoT arm.",
+)
+@click.option(
+    "--judge-model", default="openai/gpt-oss-20b",
+    help="Hallucination-judge model — kept a different model+bucket than base_model "
+    "(§8's bucket-splitting design).",
+)
+def run_baseline_eval_cmd(limit: int | None, base_model: str, judge_model: str) -> None:
+    """Runs the real single-pass baseline extraction (Phase 4's frozen
+    control arm) against every gold-annotated PriMock57 consultation and
+    scores it (Phase 5). Requires a real GROQ_API_KEY and a reachable
+    Postgres in the environment — this is a live-model run, never a
+    cassette fake, and nlp_service.db.write_pipeline_outputs unconditionally
+    needs Postgres for the same FKs the real pipeline relies on."""
+    import asyncio
+
+    import psycopg
+
+    from nlp_service.llm.groq import GroqLLMClient
+
+    groq_api_key = os.environ.get("GROQ_API_KEY", "")
+    if not groq_api_key:
+        logger.error("GROQ_API_KEY is not set — this command makes real Groq API calls")
+        sys.exit(1)
+
+    gold_dir = REPO_ROOT / "data" / "gold" / "primock57"
+    if not gold_dir.is_dir() or not list(gold_dir.glob("*.gold.json")):
+        logger.error("no gold files under %s — run `coda-eval gold-scaffold` first "
+                     "(see docs/eval/annotation_guide.md)", gold_dir)
+        sys.exit(1)
+
+    manifest_path = DATA_REGISTRY_DIR / f"{primock57.DATASET_NAME}.manifest.jsonl"
+    if not manifest_path.exists():
+        logger.error("no manifest at %s — run `coda-eval registry` first", manifest_path)
+        sys.exit(1)
+    manifest_entries = {e.session_id: e for e in read_manifest(manifest_path)}
+
+    llm_client = GroqLLMClient(api_key=groq_api_key)
+
+    try:
+        sync_conn = db.connect(PostgresConfig.from_env())
+    except Exception as exc:
+        logger.error("could not connect to Postgres (sync): %s", exc)
+        sys.exit(1)
+
+    try:
+        async_conn = asyncio.run(psycopg.AsyncConnection.connect(PostgresConfig.from_env().dsn()))
+    except Exception as exc:
+        logger.error("could not connect to Postgres (async): %s", exc)
+        sys.exit(1)
+
+    try:
+        results, summary, run_config_id, eval_run_id = asyncio.run(
+            baseline_eval.run_baseline_eval(
+                gold_dir=gold_dir,
+                manifest_entries=manifest_entries,
+                llm_client=llm_client,
+                async_conn=async_conn,
+                sync_conn=sync_conn,
+                base_model=base_model,
+                judge_model=judge_model,
+                limit=limit,
+            )
+        )
+    finally:
+        asyncio.run(async_conn.close())
+        sync_conn.close()
+
+    report_path = DOCS_EVAL_DIR / "baseline_report.md"
+    baseline_eval.write_baseline_report(results, summary, report_path)
+    baseline_eval.write_baseline_report_json(
+        results, summary, DOCS_EVAL_DIR / "baseline_report.json"
+    )
+    logger.info(
+        "done: %d/%d schema-valid, hallucination_rate=%s, report written to %s "
+        "(run_config_id=%s, eval_run_id=%s)",
+        summary.n_schema_valid, summary.n_items, summary.hallucination_rate_overall,
+        report_path, run_config_id or "(not persisted)", eval_run_id or "(not persisted)",
     )
 
 

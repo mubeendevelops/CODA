@@ -101,14 +101,26 @@ const dispatchJobStage = `-- name: DispatchJobStage :one
 INSERT INTO job_stages (job_id, stage, idempotency_key, status, attempt, deadline_at, started_at)
 VALUES ($1, $2, $3, 'running', $4, $5, now())
 ON CONFLICT (idempotency_key) DO UPDATE
-SET status = 'running',
+SET job_id = EXCLUDED.job_id,
+    status = 'running',
     attempt = EXCLUDED.attempt,
     deadline_at = EXCLUDED.deadline_at,
-    started_at = COALESCE(job_stages.started_at, now()),
+    started_at = CASE WHEN job_stages.job_id = EXCLUDED.job_id
+                       THEN COALESCE(job_stages.started_at, now())
+                       ELSE now()
+                  END,
     finished_at = NULL,
     heartbeat_at = NULL,
     percent_complete = 0,
-    step = NULL
+    step = NULL,
+    last_error = CASE WHEN job_stages.job_id = EXCLUDED.job_id
+                       THEN job_stages.last_error
+                       ELSE NULL
+                  END,
+    error_history = CASE WHEN job_stages.job_id = EXCLUDED.job_id
+                          THEN job_stages.error_history
+                          ELSE '[]'::jsonb
+                     END
 WHERE job_stages.status <> 'succeeded'
 RETURNING id, job_id, stage, idempotency_key, status, attempt, result_ref, metrics, started_at, finished_at, created_at, updated_at, percent_complete, step, heartbeat_at, deadline_at, last_error, error_history
 `
@@ -128,12 +140,31 @@ type DispatchJobStageParams struct {
 // updates the same row in place — attempt/deadline move, started_at and
 // error_history are preserved.
 //
+// RunConfig interning (ADR-0012) means a DIFFERENT job (a resubmit after a
+// prior job dead-lettered or failed without this stage ever succeeding) can
+// compute the exact same idempotency_key — same consultation, stage,
+// run_config_id, and input. Without job_id in the SET list, that row stays
+// permanently owned by the old, terminal job: the new job's own
+// GET/SSE status view shows no stages at all, while the real work's
+// heartbeats and result land invisibly against the old job's row (found
+// live: a resubmitted job inherited attempt=4 from its dead-lettered
+// predecessor's exhausted 3-attempt budget, and the job actually running
+// showed zero progress to its own caller). Reassigning job_id here is what
+// makes a resubmit behave like the fresh job it is — the caller only passes
+// attempt=1 for it (dispatch.go), since inheriting an already-exhausted
+// attempt count would immediately dead-letter a job that never got to run.
+// started_at/error_history/last_error are preserved on a genuine same-job
+// retry (the common case this dedupe exists for) but reset when ownership
+// actually changes hands, so a new job's history doesn't carry a stranger's.
+//
 // The DO UPDATE ... WHERE guard is the load-bearing part: a row already
 // 'succeeded' matches no update, so the statement returns *no rows*. That
 // is the caller's signal to skip dispatch entirely and reuse the stored
 // result_ref (GetJobStageByIdempotencyKey), which is what stops an
-// expensive stage being re-paid for after a crash. It is enforced by the
-// UNIQUE constraint, not by orchestrator correctness (ADR-0007).
+// expensive stage being re-paid for after a crash — and, deliberately,
+// what lets a resubmitted job reuse a *successful* predecessor's result
+// without recomputing it. It is enforced by the UNIQUE constraint, not by
+// orchestrator correctness (ADR-0007).
 func (q *Queries) DispatchJobStage(ctx context.Context, arg DispatchJobStageParams) (*JobStage, error) {
 	row := q.db.QueryRow(ctx, dispatchJobStage,
 		arg.JobID,

@@ -73,12 +73,31 @@ type Querier interface {
 	// updates the same row in place — attempt/deadline move, started_at and
 	// error_history are preserved.
 	//
+	// RunConfig interning (ADR-0012) means a DIFFERENT job (a resubmit after a
+	// prior job dead-lettered or failed without this stage ever succeeding) can
+	// compute the exact same idempotency_key — same consultation, stage,
+	// run_config_id, and input. Without job_id in the SET list, that row stays
+	// permanently owned by the old, terminal job: the new job's own
+	// GET/SSE status view shows no stages at all, while the real work's
+	// heartbeats and result land invisibly against the old job's row (found
+	// live: a resubmitted job inherited attempt=4 from its dead-lettered
+	// predecessor's exhausted 3-attempt budget, and the job actually running
+	// showed zero progress to its own caller). Reassigning job_id here is what
+	// makes a resubmit behave like the fresh job it is — the caller only passes
+	// attempt=1 for it (dispatch.go), since inheriting an already-exhausted
+	// attempt count would immediately dead-letter a job that never got to run.
+	// started_at/error_history/last_error are preserved on a genuine same-job
+	// retry (the common case this dedupe exists for) but reset when ownership
+	// actually changes hands, so a new job's history doesn't carry a stranger's.
+	//
 	// The DO UPDATE ... WHERE guard is the load-bearing part: a row already
 	// 'succeeded' matches no update, so the statement returns *no rows*. That
 	// is the caller's signal to skip dispatch entirely and reuse the stored
 	// result_ref (GetJobStageByIdempotencyKey), which is what stops an
-	// expensive stage being re-paid for after a crash. It is enforced by the
-	// UNIQUE constraint, not by orchestrator correctness (ADR-0007).
+	// expensive stage being re-paid for after a crash — and, deliberately,
+	// what lets a resubmitted job reuse a *successful* predecessor's result
+	// without recomputing it. It is enforced by the UNIQUE constraint, not by
+	// orchestrator correctness (ADR-0007).
 	DispatchJobStage(ctx context.Context, arg DispatchJobStageParams) (*JobStage, error)
 	// DPDP erasure on consent withdrawal (§7.2): nulls the PII-bearing columns
 	// and sets the tombstone timestamp. The row itself is retained.

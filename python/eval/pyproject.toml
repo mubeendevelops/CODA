@@ -5,12 +5,23 @@ description = "CLI-driven evaluation harness: dataset registry, session-disjoint
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "asr-service",
+    "nlp-service",
     "jiwer>=3.0,<4",
     "pyyaml>=6.0,<7",
     "psycopg[binary]>=3.2,<4",
     "click>=8.1,<9",
     "pydub>=0.25,<1",
     "numpy>=1.26,<2",
+    "jsonschema>=4.23,<5",
+    "rapidfuzz>=3.10,<4",
+    "sentence-transformers>=3.0,<4",
+    "rouge-score>=0.1,<1",
+    "bert-score>=0.3,<1",
+    # pinned below the version that requires torch's newer public
+    # torch.utils._pytree.register_pytree_node API — asr-service pins
+    # torch<2.2 for pyannote.audio 3.1.1 compatibility (decision #56b), and
+    # the two constraints must resolve together in this one uv workspace.
+    "transformers<4.36",
 ]
 
 [dependency-groups]
@@ -18,11 +29,13 @@ dev = [
     "ruff>=0.8,<1",
     "mypy>=1.13,<2",
     "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
     "types-pyyaml>=6.0,<7",
 ]
 
 [tool.uv.sources]
 asr-service = { workspace = true }
+nlp-service = { workspace = true }
 
 [project.scripts]
 coda-eval = "coda_eval.cli:main"
@@ -33,3 +46,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/coda_eval"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

@@ -1,0 +1,504 @@
+{
+  "schema_version": 1,
+  "item_id": "primock57:day1_consultation01",
+  "dataset": "primock57",
+  "session_id": "day1_consultation01",
+  "language": "en",
+  "annotator": "claude-sonnet-5 (first-pass, decision #3)",
+  "annotated_at": "2026-08-30T08:14:14.510959+00:00",
+  "n_turns": 102,
+  "speakers": [
+    {
+      "turn_id": 0,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 2,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 4,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 6,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 8,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 10,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 12,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 14,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 16,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 18,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 20,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 22,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 24,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 26,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 28,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 29,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 30,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 32,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 34,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 35,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 36,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 37,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 38,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 39,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 40,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 41,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 42,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 44,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 45,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 46,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 47,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 48,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 49,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 50,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 51,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 52,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 53,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 54,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 55,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 56,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 57,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 58,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 59,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 60,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 61,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 62,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 63,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 64,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 65,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 66,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 67,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 68,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 69,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 70,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 71,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 72,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 73,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 74,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 75,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 76,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 77,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 78,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 79,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 80,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 81,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 82,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 83,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 84,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 85,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 86,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 87,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 88,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 89,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 90,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 91,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 92,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 93,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 94,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 95,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 96,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 97,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 98,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 99,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 100,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 101,
+      "speaker": "Doctor"
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "diarrhea for the last three days, affecting toilet use and daily activities",
+      "source_turn_ids": [
+        2
+      ]
+    },
+    "hopi": {
+      "value": "3-day history of loose, watery diarrhea 6-7 times/day with no blood; crampy, intermittent left lower abdominal pain not radiating to the back; low-grade subjective fever early on, now resolved; vomiting at symptom onset, now stopped, no blood; reduced appetite but tolerating fluids; possible trigger of a Chinese takeaway meal 4 days ago; one family member (child) also vomited but without diarrhea",
+      "source_turn_ids": [
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        12,
+        14,
+        16,
+        18,
+        20,
+        22,
+        23,
+        27,
+        28,
+        31,
+        32,
+        37,
+        38,
+        40,
+        41,
+        42
+      ]
+    },
+    "examination_findings": null,
+    "treatment_plan": {
+      "value": "conservative management: push oral fluids, Dioralyte for the first couple of days, paracetamol for fever, 2-3 days off work, review in 3-4 days if not improving or sooner if worsening",
+      "source_turn_ids": [
+        75,
+        77,
+        79,
+        81,
+        83,
+        86
+      ]
+    },
+    "past_medical_history": [
+      {
+        "value": "asthma, well controlled on inhaler",
+        "source_turn_ids": [
+          44,
+          46
+        ]
+      }
+    ],
+    "medications": [
+      {
+        "value": "inhaler (for asthma)",
+        "source_turn_ids": [
+          44
+        ]
+      }
+    ],
+    "allergies": [],
+    "provisional_diagnosis": [
+      {
+        "value": "gastroenteritis",
+        "source_turn_ids": [
+          71,
+          72
+        ]
+      }
+    ],
+    "investigations_advised": [
+      {
+        "value": "stool sample test if symptoms persist",
+        "source_turn_ids": [
+          90
+        ]
+      }
+    ]
+  },
+  "summary": "Patient reports a 3-day history of watery diarrhea (6-7 times per day) with crampy left lower abdominal pain, resolved fever and vomiting, and reduced appetite, following a Chinese takeaway meal 4 days prior. He has well-controlled asthma on an inhaler and no other significant history. Diagnosed with likely gastroenteritis. Advised conservative management with oral rehydration (Dioralyte), paracetamol, and rest, with review in 3-4 days if symptoms persist."
+}

@@ -22,7 +22,8 @@ const (
 )
 
 // SpeakerRole is the assigned role of a diarized speaker cluster, produced by
-// the few-shot llama-3.1-8b-instant role classifier (architecture.md §1.2 asr-service).
+// the few-shot qwen/qwen3.6-27b role classifier (architecture.md §1.2 asr-service;
+// decision #71 — llama-3.1-8b-instant was removed from Groq's served model list).
 type SpeakerRole int32
 
 const (

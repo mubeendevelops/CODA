@@ -3,6 +3,11 @@
 - **Status:** Accepted
 - **Date:** 2026-08-27
 - **Related:** ADR-0009, ADR-0015, decision #6 (budget ₹0)
+- **Amended 2026-08-30 (claude_context.md decision #71):** `llama-3.3-70b-versatile` (generation
+  bucket) and `llama-3.1-8b-instant` (structural bucket) were both removed from Groq's served model
+  list entirely between this ADR's date and decision #71. Replaced with `qwen/qwen3.8-27b` and
+  `qwen/qwen3.6-27b` respectively — the bucket-splitting *design* below is unchanged, only the two
+  model names are stale wherever they appear in this document.
 
 ## Context
 

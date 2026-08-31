@@ -59,6 +59,17 @@ message StageMetrics {
   uint64 wall_ms = 5;
   repeated string model_ids = 6;
   double cost_estimate = 7;
+
+  // schema_valid/repair_attempts record JSON-schema validity as a metric
+  // rather than silently fixing a malformed extraction (Phase 4 requirement,
+  // claude_context.md decision #66): schema_valid is whether the FINAL
+  // extraction output validated (after any repair retries); repair_attempts
+  // is how many repair-prompt retries were spent getting there (0 if the
+  // first attempt already validated). Meaningful only for stages that
+  // produce schema-gated JSON (currently STAGE_NLP's extraction call) —
+  // zero-valued on every other stage.
+  bool schema_valid = 8;
+  uint32 repair_attempts = 9;
 }
 
 // ArtifactRef points to an object in MinIO. Artifacts are always passed by

@@ -74,7 +74,7 @@ class Error(_message.Message):
     def __init__(self, code: _Optional[str] = ..., message: _Optional[str] = ..., retryable: bool = ..., provider_status: _Optional[str] = ...) -> None: ...
 
 class StageMetrics(_message.Message):
-    __slots__ = ("tokens_in", "tokens_out", "llm_calls", "cache_hits", "wall_ms", "model_ids", "cost_estimate")
+    __slots__ = ("tokens_in", "tokens_out", "llm_calls", "cache_hits", "wall_ms", "model_ids", "cost_estimate", "schema_valid", "repair_attempts")
     TOKENS_IN_FIELD_NUMBER: _ClassVar[int]
     TOKENS_OUT_FIELD_NUMBER: _ClassVar[int]
     LLM_CALLS_FIELD_NUMBER: _ClassVar[int]
@@ -82,6 +82,8 @@ class StageMetrics(_message.Message):
     WALL_MS_FIELD_NUMBER: _ClassVar[int]
     MODEL_IDS_FIELD_NUMBER: _ClassVar[int]
     COST_ESTIMATE_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VALID_FIELD_NUMBER: _ClassVar[int]
+    REPAIR_ATTEMPTS_FIELD_NUMBER: _ClassVar[int]
     tokens_in: int
     tokens_out: int
     llm_calls: int
@@ -89,7 +91,9 @@ class StageMetrics(_message.Message):
     wall_ms: int
     model_ids: _containers.RepeatedScalarFieldContainer[str]
     cost_estimate: float
-    def __init__(self, tokens_in: _Optional[int] = ..., tokens_out: _Optional[int] = ..., llm_calls: _Optional[int] = ..., cache_hits: _Optional[int] = ..., wall_ms: _Optional[int] = ..., model_ids: _Optional[_Iterable[str]] = ..., cost_estimate: _Optional[float] = ...) -> None: ...
+    schema_valid: bool
+    repair_attempts: int
+    def __init__(self, tokens_in: _Optional[int] = ..., tokens_out: _Optional[int] = ..., llm_calls: _Optional[int] = ..., cache_hits: _Optional[int] = ..., wall_ms: _Optional[int] = ..., model_ids: _Optional[_Iterable[str]] = ..., cost_estimate: _Optional[float] = ..., schema_valid: bool = ..., repair_attempts: _Optional[int] = ...) -> None: ...
 
 class ArtifactRef(_message.Message):
     __slots__ = ("uri", "sha256", "bytes", "content_type", "kind")

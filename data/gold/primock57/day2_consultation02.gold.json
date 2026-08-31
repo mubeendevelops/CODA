@@ -1,0 +1,538 @@
+{
+  "schema_version": 1,
+  "item_id": "primock57:day2_consultation02",
+  "dataset": "primock57",
+  "session_id": "day2_consultation02",
+  "language": "en",
+  "annotator": "claude-sonnet-5 (first-pass, decision #3)",
+  "annotated_at": "2026-08-30T08:14:14.515381+00:00",
+  "n_turns": 108,
+  "speakers": [
+    {
+      "turn_id": 0,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 2,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 4,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 6,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 8,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 10,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 12,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 14,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 16,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 18,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 20,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 22,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 24,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 26,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 28,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 29,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 30,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 32,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 34,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 35,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 36,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 37,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 38,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 39,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 40,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 41,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 42,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 44,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 45,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 46,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 47,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 48,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 49,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 50,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 51,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 52,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 53,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 54,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 55,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 56,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 57,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 58,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 59,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 60,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 61,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 62,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 63,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 64,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 65,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 66,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 67,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 68,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 69,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 70,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 71,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 72,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 73,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 74,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 75,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 76,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 77,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 78,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 79,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 80,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 81,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 82,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 83,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 84,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 85,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 86,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 87,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 88,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 89,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 90,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 91,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 92,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 93,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 94,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 95,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 96,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 97,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 98,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 99,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 100,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 101,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 102,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 103,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 104,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 105,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 106,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 107,
+      "speaker": "Patient"
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "weird swelling on my elbow, noticed about a week ago",
+      "source_turn_ids": [
+        9,
+        10
+      ]
+    },
+    "hopi": {
+      "value": "noticed left elbow swelling about a week ago while showering; not painful, slightly warm, sensation of fluid inside; no trauma or injury; desk job with minimal physical activity; no similar episode before",
+      "source_turn_ids": [
+        9,
+        10,
+        11,
+        12,
+        17,
+        18,
+        20,
+        21,
+        22
+      ]
+    },
+    "examination_findings": {
+      "value": "mild erythema and minor swelling around the left olecranon (elbow tip), skin slightly warm to touch compared to surrounding skin, mild tenderness adjacent to the swelling, dry skin over the elbow tip, no signs of septic arthritis",
+      "source_turn_ids": [
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        77,
+        78,
+        79,
+        80
+      ]
+    },
+    "treatment_plan": {
+      "value": "anti-inflammatory medication (ibuprofen 400mg twice daily after food), blood tests arranged by post, follow-up appointment after results (phone/video or face-to-face), safety-net advice for signs of septic arthritis (worsening redness, pain, or spread)",
+      "source_turn_ids": [
+        62,
+        63,
+        74,
+        75,
+        82,
+        96
+      ]
+    },
+    "past_medical_history": [
+      {
+        "value": "osteoarthritis, diagnosed by a GP a few years ago",
+        "source_turn_ids": [
+          24,
+          25,
+          29,
+          30
+        ]
+      }
+    ],
+    "medications": [],
+    "allergies": [
+      {
+        "value": "peanuts",
+        "source_turn_ids": [
+          36,
+          37
+        ]
+      }
+    ],
+    "provisional_diagnosis": [
+      {
+        "value": "bursitis (olecranon bursitis)",
+        "source_turn_ids": [
+          61,
+          62
+        ]
+      }
+    ],
+    "investigations_advised": [
+      {
+        "value": "blood tests: inflammatory markers, infection screen, rheumatoid factor, urate (gout screen)",
+        "source_turn_ids": [
+          64,
+          65,
+          67,
+          68,
+          69,
+          70
+        ]
+      }
+    ]
+  },
+  "summary": "Patient presents with a one-week history of painless, mildly warm swelling of the left elbow noted incidentally, without trauma. History of osteoarthritis and a peanut allergy. Examination showed mild erythema and swelling around the olecranon with no signs of an acutely infected joint. Diagnosed as probable olecranon bursitis. Advised anti-inflammatory medication, blood tests to exclude other causes of joint swelling, and a follow-up review, with safety-netting for signs of septic arthritis."
+}

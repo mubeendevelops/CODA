@@ -95,9 +95,9 @@ type RunConfig struct {
 	Arm           string                 `protobuf:"bytes,1,opt,name=arm,proto3" json:"arm,omitempty"` // baseline | got_k1 | got_k2 | got_k2_nograph | got_k2_kg | frontier_ref
 	SchemaVersion uint32                 `protobuf:"varint,2,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
 	// Models — pinned per role, never inherited from env at runtime.
-	BaseModel       string `protobuf:"bytes,3,opt,name=base_model,json=baseModel,proto3" json:"base_model,omitempty"`                   // system under test, e.g. llama-3.3-70b-versatile
+	BaseModel       string `protobuf:"bytes,3,opt,name=base_model,json=baseModel,proto3" json:"base_model,omitempty"`                   // system under test, e.g. qwen/qwen3.8-27b (decision #71)
 	JudgeModel      string `protobuf:"bytes,4,opt,name=judge_model,json=judgeModel,proto3" json:"judge_model,omitempty"`                // e.g. openai/gpt-oss-20b
-	StructuralModel string `protobuf:"bytes,5,opt,name=structural_model,json=structuralModel,proto3" json:"structural_model,omitempty"` // e.g. llama-3.1-8b-instant
+	StructuralModel string `protobuf:"bytes,5,opt,name=structural_model,json=structuralModel,proto3" json:"structural_model,omitempty"` // e.g. qwen/qwen3.6-27b (decision #71)
 	EmbedModel      string `protobuf:"bytes,6,opt,name=embed_model,json=embedModel,proto3" json:"embed_model,omitempty"`                // e.g. all-MiniLM-L6-v2
 	AsrBackend      string `protobuf:"bytes,7,opt,name=asr_backend,json=asrBackend,proto3" json:"asr_backend,omitempty"`                // groq | faster_whisper_local
 	AsrModel        string `protobuf:"bytes,8,opt,name=asr_model,json=asrModel,proto3" json:"asr_model,omitempty"`

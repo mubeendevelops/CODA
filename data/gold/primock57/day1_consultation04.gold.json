@@ -1,0 +1,612 @@
+{
+  "schema_version": 1,
+  "item_id": "primock57:day1_consultation04",
+  "dataset": "primock57",
+  "session_id": "day1_consultation04",
+  "language": "en",
+  "annotator": "claude-sonnet-5 (first-pass, decision #3)",
+  "annotated_at": "2026-08-30T08:14:14.513389+00:00",
+  "n_turns": 132,
+  "speakers": [
+    {
+      "turn_id": 0,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 2,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 4,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 6,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 8,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 10,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 12,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 14,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 16,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 18,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 20,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 22,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 24,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 26,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 28,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 29,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 30,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 32,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 34,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 35,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 36,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 37,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 38,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 39,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 40,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 41,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 42,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 44,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 45,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 46,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 47,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 48,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 49,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 50,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 51,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 52,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 53,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 54,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 55,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 56,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 57,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 58,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 59,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 60,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 61,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 62,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 63,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 64,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 65,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 66,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 67,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 68,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 69,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 70,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 71,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 72,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 73,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 74,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 75,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 76,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 77,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 78,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 79,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 80,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 81,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 82,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 83,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 84,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 85,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 86,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 87,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 88,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 89,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 90,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 91,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 92,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 93,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 94,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 95,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 96,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 97,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 98,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 99,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 100,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 101,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 102,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 103,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 104,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 105,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 106,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 107,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 108,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 109,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 110,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 111,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 112,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 113,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 114,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 115,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 116,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 117,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 118,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 119,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 120,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 121,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 122,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 123,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 124,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 125,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 126,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 127,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 128,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 129,
+      "speaker": "Patient"
+    },
+    {
+      "turn_id": 130,
+      "speaker": "Doctor"
+    },
+    {
+      "turn_id": 131,
+      "speaker": "Patient"
+    }
+  ],
+  "fields": {
+    "chief_complaint": {
+      "value": "feeling unwell for 4 days, started with sore throat and runny nose, now developing a cough",
+      "source_turn_ids": [
+        4,
+        6,
+        7
+      ]
+    },
+    "hopi": {
+      "value": "4-day history of generally feeling unwell; sore throat now improving, painful swallowing for 1-2 days; nasal congestion; new dry, constant cough since yesterday; night sweats; fever initially, now settling with paracetamol/ibuprofen; no chest pain; winded on exertion but fine at rest; intermittent generalized headache, no visual symptoms; no nausea/vomiting; normal bowels and urine; reduced appetite; generalized muscle and joint aches for the past couple of days",
+      "source_turn_ids": [
+        4,
+        6,
+        7,
+        9,
+        13,
+        16,
+        17,
+        29,
+        30,
+        37,
+        38,
+        45,
+        46,
+        60,
+        61,
+        80,
+        81
+      ]
+    },
+    "examination_findings": null,
+    "treatment_plan": {
+      "value": "rest, plenty of fluids, continue regular paracetamol/ibuprofen, 1-2 days off work, return if not better within a week or if red-flag symptoms (high fever, worsening breathing, chest pain) develop",
+      "source_turn_ids": [
+        122,
+        123,
+        124,
+        127,
+        128
+      ]
+    },
+    "past_medical_history": [
+      {
+        "value": "grandmother has type 2 diabetes",
+        "source_turn_ids": [
+          89,
+          90
+        ]
+      },
+      {
+        "value": "great-grandfather had eczema",
+        "source_turn_ids": [
+          97,
+          98
+        ]
+      }
+    ],
+    "medications": [],
+    "allergies": [],
+    "provisional_diagnosis": [
+      {
+        "value": "viral upper respiratory tract infection, possibly early influenza",
+        "source_turn_ids": [
+          121,
+          122
+        ]
+      }
+    ],
+    "investigations_advised": []
+  },
+  "summary": "Patient reports a 4-day history of feeling generally unwell with sore throat (improving), runny nose, a new dry cough, night sweats, initial fever now settling with paracetamol/ibuprofen, exertional breathlessness, intermittent generalized headache, and muscle/joint aches. No significant past medical history, regular medications, or known allergies. Diagnosed with a likely viral upper respiratory tract infection or early influenza. Advised rest, fluids, continued paracetamol/ibuprofen, time off work, and to return if symptoms worsen or persist beyond a week."
+}

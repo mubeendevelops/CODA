@@ -24,9 +24,9 @@ message RunConfig {
   uint32 schema_version = 2;
 
   // Models — pinned per role, never inherited from env at runtime.
-  string base_model = 3;             // system under test, e.g. llama-3.3-70b-versatile
+  string base_model = 3;             // system under test, e.g. qwen/qwen3.8-27b (decision #71)
   string judge_model = 4;            // e.g. openai/gpt-oss-20b
-  string structural_model = 5;       // e.g. llama-3.1-8b-instant
+  string structural_model = 5;       // e.g. qwen/qwen3.6-27b (decision #71)
   string embed_model = 6;            // e.g. all-MiniLM-L6-v2
   string asr_backend = 7;            // groq | faster_whisper_local
   string asr_model = 8;

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14\x63oda/v1/common.proto\x12\x07\x63oda.v1\"R\n\x05\x45rror\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x11\n\tretryable\x18\x03 \x01(\x08\x12\x17\n\x0fprovider_status\x18\x04 \x01(\t\"\x97\x01\n\x0cStageMetrics\x12\x11\n\ttokens_in\x18\x01 \x01(\x04\x12\x12\n\ntokens_out\x18\x02 \x01(\x04\x12\x11\n\tllm_calls\x18\x03 \x01(\r\x12\x12\n\ncache_hits\x18\x04 \x01(\r\x12\x0f\n\x07wall_ms\x18\x05 \x01(\x04\x12\x11\n\tmodel_ids\x18\x06 \x03(\t\x12\x15\n\rcost_estimate\x18\x07 \x01(\x01\"t\n\x0b\x41rtifactRef\x12\x0b\n\x03uri\x18\x01 \x01(\t\x12\x0e\n\x06sha256\x18\x02 \x01(\t\x12\r\n\x05\x62ytes\x18\x03 \x01(\x04\x12\x14\n\x0c\x63ontent_type\x18\x04 \x01(\t\x12#\n\x04kind\x18\x05 \x01(\x0e\x32\x15.coda.v1.ArtifactKind*`\n\x05Stage\x12\x15\n\x11STAGE_UNSPECIFIED\x10\x00\x12\r\n\tSTAGE_ASR\x10\x01\x12\x10\n\x0cSTAGE_REDACT\x10\x02\x12\r\n\tSTAGE_NLP\x10\x03\x12\x10\n\x0cSTAGE_EXPORT\x10\x04*\x89\x01\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSTATUS_OK\x10\x01\x12\x14\n\x10STATUS_RETRYABLE\x10\x02\x12\x10\n\x0cSTATUS_FATAL\x10\x03\x12\x1a\n\x16STATUS_QUOTA_EXHAUSTED\x10\x04\x12\x14\n\x10STATUS_CANCELLED\x10\x05*\xf6\x02\n\x0c\x41rtifactKind\x12\x1d\n\x19\x41RTIFACT_KIND_UNSPECIFIED\x10\x00\x12\x17\n\x13\x41RTIFACT_KIND_AUDIO\x10\x01\x12\x19\n\x15\x41RTIFACT_KIND_CONSENT\x10\x02\x12\x1c\n\x18\x41RTIFACT_KIND_TRANSCRIPT\x10\x03\x12\x1f\n\x1b\x41RTIFACT_KIND_THOUGHT_GRAPH\x10\x04\x12\x1f\n\x1b\x41RTIFACT_KIND_CANDIDATE_SET\x10\x05\x12\x1f\n\x1b\x41RTIFACT_KIND_CLINICAL_NOTE\x10\x06\x12\x19\n\x15\x41RTIFACT_KIND_SUMMARY\x10\x07\x12\x1d\n\x19\x41RTIFACT_KIND_EXPORT_JSON\x10\x08\x12\x1c\n\x18\x41RTIFACT_KIND_EXPORT_PDF\x10\t\x12\x19\n\x15\x41RTIFACT_KIND_METRICS\x10\n\x12\x1f\n\x1b\x41RTIFACT_KIND_REDACTION_MAP\x10\x0b\x42*Z(coda/go/internal/genproto/coda/v1;codev1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14\x63oda/v1/common.proto\x12\x07\x63oda.v1\"R\n\x05\x45rror\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x11\n\tretryable\x18\x03 \x01(\x08\x12\x17\n\x0fprovider_status\x18\x04 \x01(\t\"\xc6\x01\n\x0cStageMetrics\x12\x11\n\ttokens_in\x18\x01 \x01(\x04\x12\x12\n\ntokens_out\x18\x02 \x01(\x04\x12\x11\n\tllm_calls\x18\x03 \x01(\r\x12\x12\n\ncache_hits\x18\x04 \x01(\r\x12\x0f\n\x07wall_ms\x18\x05 \x01(\x04\x12\x11\n\tmodel_ids\x18\x06 \x03(\t\x12\x15\n\rcost_estimate\x18\x07 \x01(\x01\x12\x14\n\x0cschema_valid\x18\x08 \x01(\x08\x12\x17\n\x0frepair_attempts\x18\t \x01(\r\"t\n\x0b\x41rtifactRef\x12\x0b\n\x03uri\x18\x01 \x01(\t\x12\x0e\n\x06sha256\x18\x02 \x01(\t\x12\r\n\x05\x62ytes\x18\x03 \x01(\x04\x12\x14\n\x0c\x63ontent_type\x18\x04 \x01(\t\x12#\n\x04kind\x18\x05 \x01(\x0e\x32\x15.coda.v1.ArtifactKind*`\n\x05Stage\x12\x15\n\x11STAGE_UNSPECIFIED\x10\x00\x12\r\n\tSTAGE_ASR\x10\x01\x12\x10\n\x0cSTAGE_REDACT\x10\x02\x12\r\n\tSTAGE_NLP\x10\x03\x12\x10\n\x0cSTAGE_EXPORT\x10\x04*\x89\x01\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSTATUS_OK\x10\x01\x12\x14\n\x10STATUS_RETRYABLE\x10\x02\x12\x10\n\x0cSTATUS_FATAL\x10\x03\x12\x1a\n\x16STATUS_QUOTA_EXHAUSTED\x10\x04\x12\x14\n\x10STATUS_CANCELLED\x10\x05*\xf6\x02\n\x0c\x41rtifactKind\x12\x1d\n\x19\x41RTIFACT_KIND_UNSPECIFIED\x10\x00\x12\x17\n\x13\x41RTIFACT_KIND_AUDIO\x10\x01\x12\x19\n\x15\x41RTIFACT_KIND_CONSENT\x10\x02\x12\x1c\n\x18\x41RTIFACT_KIND_TRANSCRIPT\x10\x03\x12\x1f\n\x1b\x41RTIFACT_KIND_THOUGHT_GRAPH\x10\x04\x12\x1f\n\x1b\x41RTIFACT_KIND_CANDIDATE_SET\x10\x05\x12\x1f\n\x1b\x41RTIFACT_KIND_CLINICAL_NOTE\x10\x06\x12\x19\n\x15\x41RTIFACT_KIND_SUMMARY\x10\x07\x12\x1d\n\x19\x41RTIFACT_KIND_EXPORT_JSON\x10\x08\x12\x1c\n\x18\x41RTIFACT_KIND_EXPORT_PDF\x10\t\x12\x19\n\x15\x41RTIFACT_KIND_METRICS\x10\n\x12\x1f\n\x1b\x41RTIFACT_KIND_REDACTION_MAP\x10\x0b\x42*Z(coda/go/internal/genproto/coda/v1;codev1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,16 +32,16 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'coda.v1.common_pb2', _globa
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z(coda/go/internal/genproto/coda/v1;codev1'
-  _globals['_STAGE']._serialized_start=389
-  _globals['_STAGE']._serialized_end=485
-  _globals['_STATUS']._serialized_start=488
-  _globals['_STATUS']._serialized_end=625
-  _globals['_ARTIFACTKIND']._serialized_start=628
-  _globals['_ARTIFACTKIND']._serialized_end=1002
+  _globals['_STAGE']._serialized_start=436
+  _globals['_STAGE']._serialized_end=532
+  _globals['_STATUS']._serialized_start=535
+  _globals['_STATUS']._serialized_end=672
+  _globals['_ARTIFACTKIND']._serialized_start=675
+  _globals['_ARTIFACTKIND']._serialized_end=1049
   _globals['_ERROR']._serialized_start=33
   _globals['_ERROR']._serialized_end=115
   _globals['_STAGEMETRICS']._serialized_start=118
-  _globals['_STAGEMETRICS']._serialized_end=269
-  _globals['_ARTIFACTREF']._serialized_start=271
-  _globals['_ARTIFACTREF']._serialized_end=387
+  _globals['_STAGEMETRICS']._serialized_end=316
+  _globals['_ARTIFACTREF']._serialized_start=318
+  _globals['_ARTIFACTREF']._serialized_end=434
 # @@protoc_insertion_point(module_scope)
