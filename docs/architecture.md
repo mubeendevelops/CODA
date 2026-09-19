@@ -102,6 +102,17 @@ also read `run_configs` by id, which resolves claude_context.md decision
 no such path). It must still never write `jobs`/`job_stages` (the
 orchestrator's exclusive tables) or make retry/workflow decisions.
 
+Extended 2026-09-03 (Phase 6 Modules 1-2, claude_context.md decision #89):
+nlp-service additionally writes `thoughts`/`thought_edges` — the graph it
+constructs — and `transcripts`/`turns`, which it materializes from the
+redacted transcript artifact. The last two are not its own outputs, and it
+writes them only because `thoughts.turn_id` is a foreign key into `turns` and
+**nothing in the system had ever written either table**. go-orchestrator
+cannot do it (§1.3 restricts it to metadata-only object-storage reads, so it
+cannot read artifact bytes back), and nlp-service is already holding the
+parsed transcript. The write is an idempotent upsert on each table's natural
+key, never a mutation of clinical content it did not compute.
+
 #### Infrastructure
 
 | Service | Owns | Must NOT |
@@ -131,7 +142,8 @@ nlp-service ──┬──► redis (consumer group on stage.nlp)
               ├──► minio (read transcript, write graph/candidates/note)
               ├──► postgres (LLM response cache; run_configs read;
               │              extractions/summaries/clinical_notes write —
-              │              decision #66)
+              │              decision #66; thoughts/thought_edges write and
+              │              transcripts/turns materialize — decision #89)
               └──► Groq chat API (multiple model buckets)
 ```
 
@@ -552,14 +564,38 @@ does not depend on application correctness.
 |---|---|
 | `transcripts` | `id`, `consultation_id`, `run_config_id`, `uri`, `asr_backend`, `asr_model`, `wer NULL`, `der NULL`, `language` |
 | `turns` | `id`, `transcript_id`, `turn_index`, `speaker_label` (`doctor` \| `patient` \| `unknown`), `start_ms`, `end_ms`, `text`, `text_redacted`, `confidence` |
-| `thoughts` | `id`, `consultation_id`, `run_config_id`, `turn_id → turns`, `speaker`, `text`, `entities jsonb`, `category`, `temporal_anchor`, `linked_concepts jsonb` |
-| `thought_edges` | `id`, `consultation_id`, `run_config_id`, `src_thought_id`, `dst_thought_id`, `edge_type` (`temporal` \| `causal` \| `logical`), `weight real`, `predicted_by` (`rule` \| `llm`) |
+| `thoughts` | `id`, `consultation_id`, `run_config_id`, `turn_id → turns`, `turn_index`, `speaker`, `text`, `entities jsonb`, `category`, `temporal_anchor`, `linked_concepts jsonb`, `polarity` (`asserted` \| `negated` \| `uncertain` \| `hypothetical`), `confidence real`, `char_start`, `char_end` |
+| `thought_edges` | `id`, `consultation_id`, `run_config_id`, `src_thought_id`, `dst_thought_id`, `edge_type` (`temporal` \| `causal` \| `logical` \| `negation` \| `elaboration` \| `coreference`), `weight real`, `predicted_by` (`rule` \| `llm`), `rationale` |
 | `extractions` | `id`, `consultation_id`, `run_config_id`, `field_key` (one of the 8), `value jsonb` (`FieldValue`), `candidate_set_uri`, `selected_candidate_idx`, `score_breakdown jsonb`, `iteration` |
 | `summaries` | `id`, `consultation_id`, `run_config_id`, `text`, `rouge_l NULL`, `bertscore NULL` |
 | `clinical_notes` | `id`, `consultation_id`, `run_config_id`, `version`, `status` (`draft` \| `under_review` \| `approved`), `note jsonb`, `approved_by → users NULL`, `approved_at NULL` |
 
 `extractions` is keyed per field per run config, which is what makes per-field ablation comparison a
 plain `GROUP BY` rather than a file-parsing exercise.
+
+**Amended 2026-09-03 (migration 000032, claude_context.md decisions #89-#91).** `thoughts` and
+`thought_edges` as originally specified above described GoT-HCS's prose-EHR node construction. Both
+were extended for the conversational setting when Modules 1-2 were built:
+
+- `thoughts.polarity` is what makes a symptom asserted in one turn and negated eight turns later
+  survive as **two linked thoughts** rather than one silently overwritten by the later. Without it
+  "no chest pain" and "chest pain" are indistinguishable by the time distillation runs.
+  `uncertain`/`hypothetical` are kept separate from `asserted` because collapsing hedged speech into
+  assertion manufactures the certainty claude_context.md §3 scores as a hallucination.
+- `thoughts.char_start`/`char_end` are a `[start, end)` span into the source turn's **redacted**
+  text. A single turn routinely yields several thoughts, so citing the turn alone is not adequate
+  provenance.
+- `thought_edges.edge_type` gained `negation`, `elaboration`, `coreference` — the three relations
+  that only exist because the input is dialogue. `temporal` remains rule-derived and is the only
+  edge type that costs no tokens.
+- `transcripts` gained `UNIQUE (consultation_id, run_config_id)`. This supersedes migration 000015's
+  "a re-run produces a new row" comment: a re-run of the *same* run_config is an at-least-once
+  redelivery (§2.3) and must be idempotent, while a different run_config still gets its own row,
+  which is what the ablation needs.
+
+`turn_id` remains a real foreign key into `turns`. Nothing populated `transcripts` or `turns` before
+this — the sqlc queries existed and were called from nowhere — so nlp-service now materializes both
+from the redacted transcript artifact before writing thoughts. §1.2/§1.3 amended accordingly.
 
 ### 5.4 Review and audit
 

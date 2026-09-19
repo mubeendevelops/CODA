@@ -109,10 +109,12 @@ async def run_extraction(
             break
 
         repair_attempts += 1
-        user_prompt = pr.user_template.format(
-            transcript_turns=transcript_turns_text
-        ) + "\n\n" + pr.repair_addendum_template.format(
-            validation_error=last_error, previous_response=last_content
+        user_prompt = (
+            pr.user_template.format(transcript_turns=transcript_turns_text)
+            + "\n\n"
+            + pr.repair_addendum_template.format(
+                validation_error=last_error, previous_response=last_content
+            )
         )
 
     # NOTE: coda_worker_sdk.worker.StageWorker's exception boundary discards

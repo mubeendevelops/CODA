@@ -37,7 +37,11 @@ async def test_cache_miss_calls_llm_and_stores(monkeypatch: pytest.MonkeyPatch) 
 
 async def test_cache_hit_skips_llm_call(monkeypatch: pytest.MonkeyPatch) -> None:
     cached = LLMCompletion(
-        content="cached response", tokens_in=1, tokens_out=1, model="m1", latency_ms=0,
+        content="cached response",
+        tokens_in=1,
+        tokens_out=1,
+        model="m1",
+        latency_ms=0,
         cost_estimate=0.0,
     )
 

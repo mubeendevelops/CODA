@@ -8,7 +8,6 @@ from google.protobuf import json_format
 
 from coda.v1 import common_pb2, envelope_pb2, runconfig_pb2, transcript_pb2
 from coda_worker_sdk import StageContext
-from coda_worker_sdk.errors import FatalError
 from nlp_service import db
 from nlp_service.llm.cassette import CassetteLLMClient, CassetteTurn
 from nlp_service.worker import build_nlp_handler
@@ -112,9 +111,7 @@ async def test_handle_nlp_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
         return db.RunConfigRow(
             id=run_config_id,
             arm="baseline",
-            config=runconfig_pb2.RunConfig(
-                base_model="qwen/qwen3.8-27b", got_enabled=False
-            ),
+            config=runconfig_pb2.RunConfig(base_model="qwen/qwen3.8-27b", got_enabled=False),
         )
 
     async def _write_outputs(conn: object, **kwargs: object) -> None:
@@ -175,7 +172,21 @@ async def test_handle_nlp_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     assert summary_json["text"] == "Patient presented with a cough."
 
 
-async def test_handle_nlp_rejects_got_arm(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_handle_nlp_got_arm_no_longer_short_circuits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A `got_enabled=true` config used to be rejected outright with
+    `GOT_NOT_IMPLEMENTED` before reading anything. It now runs GoT-HCS
+    Modules 1-2 (thought construction and graph assembly) for real and fails
+    only at the unbuilt reasoning half — see
+    `tests/graph/test_worker_got_arm.py` for the full GoT-arm behaviour.
+
+    What this test still guards is the ordering: the handler must reach the
+    transcript before deciding anything about the GoT arm. The
+    missing-artifact KeyError below is the evidence — under the old code the
+    stage raised before `get_bytes` was ever called.
+    """
+
     async def _fetch_run_config(conn: object, run_config_id: str) -> db.RunConfigRow:
         return db.RunConfigRow(
             id=run_config_id,
@@ -199,6 +210,5 @@ async def test_handle_nlp_rejects_got_arm(monkeypatch: pytest.MonkeyPatch) -> No
         logger=__import__("logging").getLogger("test"),
     )
 
-    with pytest.raises(FatalError) as exc_info:
+    with pytest.raises(KeyError):
         await handler(ctx)
-    assert exc_info.value.code == "GOT_NOT_IMPLEMENTED"

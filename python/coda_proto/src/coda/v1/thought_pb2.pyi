@@ -26,6 +26,17 @@ class EdgeType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EDGE_TYPE_TEMPORAL: _ClassVar[EdgeType]
     EDGE_TYPE_CAUSAL: _ClassVar[EdgeType]
     EDGE_TYPE_LOGICAL: _ClassVar[EdgeType]
+    EDGE_TYPE_NEGATION: _ClassVar[EdgeType]
+    EDGE_TYPE_ELABORATION: _ClassVar[EdgeType]
+    EDGE_TYPE_COREFERENCE: _ClassVar[EdgeType]
+
+class Polarity(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    POLARITY_UNSPECIFIED: _ClassVar[Polarity]
+    POLARITY_ASSERTED: _ClassVar[Polarity]
+    POLARITY_NEGATED: _ClassVar[Polarity]
+    POLARITY_UNCERTAIN: _ClassVar[Polarity]
+    POLARITY_HYPOTHETICAL: _ClassVar[Polarity]
 
 class PredictedBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -46,6 +57,14 @@ EDGE_TYPE_UNSPECIFIED: EdgeType
 EDGE_TYPE_TEMPORAL: EdgeType
 EDGE_TYPE_CAUSAL: EdgeType
 EDGE_TYPE_LOGICAL: EdgeType
+EDGE_TYPE_NEGATION: EdgeType
+EDGE_TYPE_ELABORATION: EdgeType
+EDGE_TYPE_COREFERENCE: EdgeType
+POLARITY_UNSPECIFIED: Polarity
+POLARITY_ASSERTED: Polarity
+POLARITY_NEGATED: Polarity
+POLARITY_UNCERTAIN: Polarity
+POLARITY_HYPOTHETICAL: Polarity
 PREDICTED_BY_UNSPECIFIED: PredictedBy
 PREDICTED_BY_RULE: PredictedBy
 PREDICTED_BY_LLM: PredictedBy
@@ -63,7 +82,7 @@ class LinkedEntity(_message.Message):
     def __init__(self, text: _Optional[str] = ..., mesh_id: _Optional[str] = ..., icd10_code: _Optional[str] = ..., entity_type: _Optional[str] = ...) -> None: ...
 
 class Thought(_message.Message):
-    __slots__ = ("id", "consultation_id", "run_config_id", "turn_id", "speaker", "text", "entities", "category", "temporal_anchor", "linked_concepts")
+    __slots__ = ("id", "consultation_id", "run_config_id", "turn_id", "speaker", "text", "entities", "category", "temporal_anchor", "linked_concepts", "polarity", "confidence", "char_start", "char_end", "turn_index")
     ID_FIELD_NUMBER: _ClassVar[int]
     CONSULTATION_ID_FIELD_NUMBER: _ClassVar[int]
     RUN_CONFIG_ID_FIELD_NUMBER: _ClassVar[int]
@@ -74,6 +93,11 @@ class Thought(_message.Message):
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     TEMPORAL_ANCHOR_FIELD_NUMBER: _ClassVar[int]
     LINKED_CONCEPTS_FIELD_NUMBER: _ClassVar[int]
+    POLARITY_FIELD_NUMBER: _ClassVar[int]
+    CONFIDENCE_FIELD_NUMBER: _ClassVar[int]
+    CHAR_START_FIELD_NUMBER: _ClassVar[int]
+    CHAR_END_FIELD_NUMBER: _ClassVar[int]
+    TURN_INDEX_FIELD_NUMBER: _ClassVar[int]
     id: str
     consultation_id: str
     run_config_id: str
@@ -84,10 +108,15 @@ class Thought(_message.Message):
     category: ThoughtCategory
     temporal_anchor: str
     linked_concepts: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, id: _Optional[str] = ..., consultation_id: _Optional[str] = ..., run_config_id: _Optional[str] = ..., turn_id: _Optional[str] = ..., speaker: _Optional[_Union[_transcript_pb2.SpeakerRole, str]] = ..., text: _Optional[str] = ..., entities: _Optional[_Iterable[_Union[LinkedEntity, _Mapping]]] = ..., category: _Optional[_Union[ThoughtCategory, str]] = ..., temporal_anchor: _Optional[str] = ..., linked_concepts: _Optional[_Iterable[str]] = ...) -> None: ...
+    polarity: Polarity
+    confidence: float
+    char_start: int
+    char_end: int
+    turn_index: int
+    def __init__(self, id: _Optional[str] = ..., consultation_id: _Optional[str] = ..., run_config_id: _Optional[str] = ..., turn_id: _Optional[str] = ..., speaker: _Optional[_Union[_transcript_pb2.SpeakerRole, str]] = ..., text: _Optional[str] = ..., entities: _Optional[_Iterable[_Union[LinkedEntity, _Mapping]]] = ..., category: _Optional[_Union[ThoughtCategory, str]] = ..., temporal_anchor: _Optional[str] = ..., linked_concepts: _Optional[_Iterable[str]] = ..., polarity: _Optional[_Union[Polarity, str]] = ..., confidence: _Optional[float] = ..., char_start: _Optional[int] = ..., char_end: _Optional[int] = ..., turn_index: _Optional[int] = ...) -> None: ...
 
 class ThoughtEdge(_message.Message):
-    __slots__ = ("id", "consultation_id", "run_config_id", "src_thought_id", "dst_thought_id", "edge_type", "weight", "predicted_by")
+    __slots__ = ("id", "consultation_id", "run_config_id", "src_thought_id", "dst_thought_id", "edge_type", "weight", "predicted_by", "rationale")
     ID_FIELD_NUMBER: _ClassVar[int]
     CONSULTATION_ID_FIELD_NUMBER: _ClassVar[int]
     RUN_CONFIG_ID_FIELD_NUMBER: _ClassVar[int]
@@ -96,6 +125,7 @@ class ThoughtEdge(_message.Message):
     EDGE_TYPE_FIELD_NUMBER: _ClassVar[int]
     WEIGHT_FIELD_NUMBER: _ClassVar[int]
     PREDICTED_BY_FIELD_NUMBER: _ClassVar[int]
+    RATIONALE_FIELD_NUMBER: _ClassVar[int]
     id: str
     consultation_id: str
     run_config_id: str
@@ -104,16 +134,27 @@ class ThoughtEdge(_message.Message):
     edge_type: EdgeType
     weight: float
     predicted_by: PredictedBy
-    def __init__(self, id: _Optional[str] = ..., consultation_id: _Optional[str] = ..., run_config_id: _Optional[str] = ..., src_thought_id: _Optional[str] = ..., dst_thought_id: _Optional[str] = ..., edge_type: _Optional[_Union[EdgeType, str]] = ..., weight: _Optional[float] = ..., predicted_by: _Optional[_Union[PredictedBy, str]] = ...) -> None: ...
+    rationale: str
+    def __init__(self, id: _Optional[str] = ..., consultation_id: _Optional[str] = ..., run_config_id: _Optional[str] = ..., src_thought_id: _Optional[str] = ..., dst_thought_id: _Optional[str] = ..., edge_type: _Optional[_Union[EdgeType, str]] = ..., weight: _Optional[float] = ..., predicted_by: _Optional[_Union[PredictedBy, str]] = ..., rationale: _Optional[str] = ...) -> None: ...
 
 class ThoughtGraph(_message.Message):
-    __slots__ = ("consultation_id", "run_config_id", "thoughts", "edges")
+    __slots__ = ("consultation_id", "run_config_id", "thoughts", "edges", "prompt_set_hash", "language", "construction_model", "edge_model", "turn_count")
     CONSULTATION_ID_FIELD_NUMBER: _ClassVar[int]
     RUN_CONFIG_ID_FIELD_NUMBER: _ClassVar[int]
     THOUGHTS_FIELD_NUMBER: _ClassVar[int]
     EDGES_FIELD_NUMBER: _ClassVar[int]
+    PROMPT_SET_HASH_FIELD_NUMBER: _ClassVar[int]
+    LANGUAGE_FIELD_NUMBER: _ClassVar[int]
+    CONSTRUCTION_MODEL_FIELD_NUMBER: _ClassVar[int]
+    EDGE_MODEL_FIELD_NUMBER: _ClassVar[int]
+    TURN_COUNT_FIELD_NUMBER: _ClassVar[int]
     consultation_id: str
     run_config_id: str
     thoughts: _containers.RepeatedCompositeFieldContainer[Thought]
     edges: _containers.RepeatedCompositeFieldContainer[ThoughtEdge]
-    def __init__(self, consultation_id: _Optional[str] = ..., run_config_id: _Optional[str] = ..., thoughts: _Optional[_Iterable[_Union[Thought, _Mapping]]] = ..., edges: _Optional[_Iterable[_Union[ThoughtEdge, _Mapping]]] = ...) -> None: ...
+    prompt_set_hash: str
+    language: str
+    construction_model: str
+    edge_model: str
+    turn_count: int
+    def __init__(self, consultation_id: _Optional[str] = ..., run_config_id: _Optional[str] = ..., thoughts: _Optional[_Iterable[_Union[Thought, _Mapping]]] = ..., edges: _Optional[_Iterable[_Union[ThoughtEdge, _Mapping]]] = ..., prompt_set_hash: _Optional[str] = ..., language: _Optional[str] = ..., construction_model: _Optional[str] = ..., edge_model: _Optional[str] = ..., turn_count: _Optional[int] = ...) -> None: ...

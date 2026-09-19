@@ -14,17 +14,51 @@ message Candidate {
   string text = 3;
   repeated string source_thought_ids = 4;
   string generated_by_model = 5;
+
+  // Which diverse-prompt/subgraph variant produced this candidate
+  // (e.g. "conservative", "inclusive", "verbatim"). N candidates come from
+  // N variants, not N samples of one prompt — recorded so a case-study
+  // figure can say *why* two candidates differ, not just that they do.
+  string variant = 6;
+
+  // True when this candidate is a refinement of a previously selected one
+  // rather than a fresh generation. Distinguishes iteration 0's N parallel
+  // candidates from iterations 1..K's critique-and-regenerate outputs.
+  bool is_refinement = 7;
+
+  // For a list-valued field, the candidate's items. `text` stays populated
+  // with the joined rendering so a scorer never has to special-case shape.
+  repeated string items = 8;
 }
 
 // ScoreBreakdown is the 3-criteria score for one candidate. Two of the three
 // criteria are local (MiniLM embedding similarity, n-gram overlap) and cost
 // zero API calls (ADR-0009); only relevance calls the judge model.
 message ScoreBreakdown {
-  float relevance = 1;      // LLM-as-judge rubric + entity overlap with source
-  float consistency = 2;    // local MiniLM embedding similarity to supporting thoughts
-  float redundancy = 3;     // n-gram overlap with prior selections
-  float aggregate = 4;      // weighted sum, weights from RunConfig.scorer_weights
+  float relevance = 1;      // entity overlap with the supporting subgraph
+  float consistency = 2;    // embedding similarity to source thoughts, minus contradiction penalty
+  float redundancy = 3;     // RAW n-gram overlap with already-selected content: HIGHER IS WORSE
+  float aggregate = 4;      // w_rel*relevance + w_con*consistency - w_red*redundancy
   string judge_model = 5;   // empty if this score used no LLM call
+
+  // Which scorer produced this breakdown: "heuristic" or "llm_judge".
+  // With RunConfig.scorer_backend = "both", two ScoreBreakdowns are recorded
+  // per candidate and this is what tells them apart (decision #96).
+  string scorer_backend = 6;
+
+  // How consistency was actually computed — "minilm" or "lexical". The
+  // lexical fallback runs when the embedding model is unavailable; a score
+  // must never silently claim to be an embedding similarity when it is not
+  // (decision #97).
+  string consistency_backend = 7;
+
+  // Consistency's second term, reported separately because it is the one
+  // clinically-loaded component: a candidate asserting content its own
+  // supporting thoughts negate is penalized here, not merely scored low.
+  float contradiction_penalty = 8;
+
+  // One short justification, populated only by the llm_judge backend.
+  string judge_rationale = 9;
 }
 
 // CandidateSet is all N candidates and their scores for one field, at one
@@ -37,6 +71,15 @@ message CandidateSet {
   repeated Candidate candidates = 5;
   repeated ScoreBreakdown scores = 6;      // index-aligned with candidates
   uint32 selected_index = 7;
+
+  // Present only when RunConfig.scorer_backend = "both": the scores the
+  // NON-selecting backend produced, index-aligned with `candidates`. Kept so
+  // the report can ask whether a cheap local scorer and an LLM judge agree,
+  // which is itself a result worth having.
+  repeated ScoreBreakdown secondary_scores = 8;
+
+  // Estimated context tokens the generation call spent on this field.
+  uint32 context_tokens = 9;
 }
 
 // RefinementTrace is the full K-iteration generate/score/select/refine history
@@ -47,4 +90,18 @@ message RefinementTrace {
   FieldKey field_key = 3;
   repeated CandidateSet iterations = 4;
   FieldValue final_value = 5;
+
+  // Aggregate score of the selected candidate at each iteration, in order.
+  // The score trajectory is the direct evidence for whether refinement
+  // helps at all — a flat or falling trajectory is a reportable negative
+  // result, so it is stored explicitly rather than left to be recomputed.
+  repeated float score_trajectory = 6;
+
+  // Per-field inference cost, for the cost comparison against the
+  // single-pass baseline (plan.md Phase 6 AC5).
+  uint32 tokens_in = 7;
+  uint32 tokens_out = 8;
+  uint32 llm_calls = 9;
+  uint32 cache_hits = 10;
+  string scorer_backend = 11;
 }

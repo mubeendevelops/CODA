@@ -40,6 +40,24 @@ message RunConfig {
   string kg_backend = 14;            // scispacy_mesh | rapidfuzz_mesh | none
   ScorerWeights scorer_weights = 15;
 
+  // Which scorer runs (Module 5). "heuristic" = entity overlap + local
+  // embedding similarity + n-gram overlap, zero API calls. "llm_judge" =
+  // the written rubric on judge_model. "both" runs each and records both
+  // ScoreBreakdowns, with `scorer_backend` on the breakdown saying which
+  // one actually drove selection. Empty defaults to "heuristic".
+  //
+  // This is a field rather than a code branch because architecture.md §6
+  // requires every ablation dimension to be configuration reproducible from
+  // the database alone.
+  string scorer_backend = 21;      // heuristic | llm_judge | both
+
+  // Per-field context budget for candidate generation, in estimated tokens.
+  // Distinct from graph retrieval's own budget: generation batches all 8
+  // fields into one call per candidate variant, so its per-field share has
+  // to be much smaller to stay inside claude_context.md §8's ~7.5K estimate
+  // for this stage. 0 means "use the compiled default" (decision #98).
+  uint32 generation_context_tokens = 22;
+
   // Determinism.
   float temperature = 16;
   float top_p = 17;

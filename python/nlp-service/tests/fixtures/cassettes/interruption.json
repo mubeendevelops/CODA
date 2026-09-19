@@ -1,0 +1,12 @@
+[
+  {
+    "content": "{\"thoughts\": [{\"turn_index\": 1, \"text_span\": \"It started two days ago, in the middle of my chest\", \"text\": \"Central chest pain, onset two days ago\", \"entities\": [\"chest pain\", \"chest\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": \"two days ago\", \"polarity\": \"asserted\", \"confidence\": 1.0}, {\"turn_index\": 2, \"text_span\": \"It's a sort of pressure\", \"text\": \"Chest pain is pressure-like in character\", \"entities\": [\"chest pain\", \"pressure\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": null, \"polarity\": \"asserted\", \"confidence\": 0.9}, {\"turn_index\": 4, \"text_span\": \"Down my left arm\", \"text\": \"Chest pain radiates down the left arm\", \"entities\": [\"chest pain\", \"left arm\", \"radiation\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": null, \"polarity\": \"asserted\", \"confidence\": 0.8}, {\"turn_index\": 4, \"text_span\": \"Mostly when I'm walking uphill\", \"text\": \"Chest pain is brought on by walking uphill\", \"entities\": [\"chest pain\", \"exertion\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": null, \"polarity\": \"asserted\", \"confidence\": 0.9}, {\"turn_index\": 6, \"text_span\": \"Yes, after a few minutes\", \"text\": \"Chest pain eases within a few minutes of rest\", \"entities\": [\"chest pain\", \"rest\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": \"after a few minutes\", \"polarity\": \"asserted\", \"confidence\": 0.85}]}",
+    "tokens_in": 900,
+    "tokens_out": 450
+  },
+  {
+    "content": "{\"edges\": [{\"src_thought_id\": \"t1\", \"dst_thought_id\": \"t2\", \"edge_type\": \"elaboration\", \"confidence\": 0.95, \"rationale\": \"adds character to the same chest pain\"}, {\"src_thought_id\": \"t2\", \"dst_thought_id\": \"t3\", \"edge_type\": \"elaboration\", \"confidence\": 0.9, \"rationale\": \"radiation completes the interrupted description\"}, {\"src_thought_id\": \"t1\", \"dst_thought_id\": \"t3\", \"edge_type\": \"elaboration\", \"confidence\": 0.85, \"rationale\": \"radiation adds detail to the chest pain\"}, {\"src_thought_id\": \"t4\", \"dst_thought_id\": \"t1\", \"edge_type\": \"causal\", \"confidence\": 0.8, \"rationale\": \"exertion is named as the trigger for the pain\"}, {\"src_thought_id\": \"t4\", \"dst_thought_id\": \"t5\", \"edge_type\": \"elaboration\", \"confidence\": 0.85, \"rationale\": \"relief on rest qualifies the exertional pattern\"}]}",
+    "tokens_in": 400,
+    "tokens_out": 200
+  }
+]

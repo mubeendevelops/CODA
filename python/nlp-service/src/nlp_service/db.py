@@ -53,9 +53,7 @@ class RunConfigRow:
 
 async def fetch_run_config(conn: psycopg.AsyncConnection, run_config_id: str) -> RunConfigRow:
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(
-            "SELECT id, arm, config FROM run_configs WHERE id = %s", (run_config_id,)
-        )
+        await cur.execute("SELECT id, arm, config FROM run_configs WHERE id = %s", (run_config_id,))
         row = await cur.fetchone()
     if row is None:
         raise LookupError(f"nlp_service.db: no run_configs row for id={run_config_id!r}")
@@ -161,13 +159,25 @@ async def write_pipeline_outputs(
                 # (§3: absent information is null, never a fabricated
                 # empty-but-present record).
                 continue
-            for value in values:
+            # `value_index` is part of the uniqueness key (migration 000033).
+            # Before it existed, every item of a list-valued field was
+            # inserted with iteration = 0 against a UNIQUE
+            # (consultation, run_config, field_key, iteration) constraint, so
+            # a 3-item past_medical_history wrote three rows that collided and
+            # only the last survived. Evaluation never saw it (metrics score
+            # the clinical_notes JSON blob), but `extractions` — the table
+            # architecture.md §5.3 says exists to make per-field ablation a
+            # plain GROUP BY — had been silently truncating lists since
+            # Phase 4.
+            for value_index, value in enumerate(values):
                 await cur.execute(
                     """
                         INSERT INTO extractions
-                            (consultation_id, run_config_id, field_key, value, iteration)
-                        VALUES (%s, %s, %s, %s, 0)
-                        ON CONFLICT (consultation_id, run_config_id, field_key, iteration)
+                            (consultation_id, run_config_id, field_key, value,
+                             iteration, value_index)
+                        VALUES (%s, %s, %s, %s, 0, %s)
+                        ON CONFLICT
+                            (consultation_id, run_config_id, field_key, iteration, value_index)
                         DO UPDATE SET value = EXCLUDED.value
                         """,
                     (
@@ -175,6 +185,7 @@ async def write_pipeline_outputs(
                         run_config_id,
                         field_key,
                         json_format.MessageToJson(value, preserving_proto_field_name=True),
+                        value_index,
                     ),
                 )
 

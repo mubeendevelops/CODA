@@ -23,11 +23,46 @@ enum ThoughtCategory {
 
 // EdgeType distinguishes rule-derived temporal edges from LLM-predicted edges
 // (claude_context.md §6 — "GAT (attention propagation)" row).
+//
+// TEMPORAL is derived by rule from turn order and is the one edge type that
+// costs no tokens: in dialogue, turn order *is* temporal order, which is the
+// structural advantage conversational input has over the prose EHR text
+// GoT-HCS was designed for (claude_context.md §6, decision #10).
+//
+// NEGATION, ELABORATION and COREFERENCE (4-6) were added for the dialogue
+// setting and have no counterpart in architecture.md §5.3's original
+// three-value list. They exist because the dialogue-specific cases in
+// hypothesis H3 are not expressible without them: NEGATION is what makes a
+// symptom asserted in turn 3 and denied in turn 9 two linked thoughts rather
+// than one silently-overwritten thought; ELABORATION is what stitches a
+// symptom described across three non-adjacent turns back together;
+// COREFERENCE is what resolves "it"/"that"/"the same thing" across an
+// interruption. Additive enum values — proto3 keeps the wire compatible.
 enum EdgeType {
   EDGE_TYPE_UNSPECIFIED = 0;
   EDGE_TYPE_TEMPORAL = 1;
   EDGE_TYPE_CAUSAL = 2;
   EDGE_TYPE_LOGICAL = 3;
+  EDGE_TYPE_NEGATION = 4;
+  EDGE_TYPE_ELABORATION = 5;
+  EDGE_TYPE_COREFERENCE = 6;
+}
+
+// Polarity is the assertion status of a thought's clinical content. Absent
+// this, a negated symptom and an asserted one are indistinguishable once the
+// text is summarized, and "no chest pain" distills into "chest pain".
+//
+// UNCERTAIN and HYPOTHETICAL are kept distinct from ASSERTED deliberately:
+// claude_context.md §3 requires that absent or unsupported information is
+// never asserted as fact, and collapsing "maybe a bit of nausea" or "if the
+// fever comes back" into ASSERTED would manufacture exactly the certainty
+// that §3 scores as a hallucination.
+enum Polarity {
+  POLARITY_UNSPECIFIED = 0;
+  POLARITY_ASSERTED = 1;      // stated as true: "I have a cough"
+  POLARITY_NEGATED = 2;       // stated as false: "no, no chest pain"
+  POLARITY_UNCERTAIN = 3;     // hedged: "maybe", "I think", "possibly"
+  POLARITY_HYPOTHETICAL = 4;  // conditional/future: "if the fever comes back"
 }
 
 enum PredictedBy {
@@ -58,6 +93,26 @@ message Thought {
   ThoughtCategory category = 8;
   string temporal_anchor = 9;     // turn order is temporal order in dialogue
   repeated string linked_concepts = 10;  // MeSH / ICD-10 identifiers
+
+  // Added for the conversational setting (claude_context.md §6, H3). All
+  // additive field numbers — nothing above renumbered.
+  Polarity polarity = 11;
+  float confidence = 12;          // 0.0-1.0, how directly the turn supports this thought
+
+  // text_span: [char_start, char_end) into the source turn's redacted text,
+  // so a thought is traceable to the exact words that produced it rather
+  // than to a whole turn. A turn routinely yields several thoughts ("I've
+  // had a cough for three days and I'm also short of breath"), so the turn
+  // alone is not sufficient provenance.
+  uint32 char_start = 13;
+  uint32 char_end = 14;
+
+  // Denormalized copy of the source turn's turn_index. `turn_id` is a
+  // database UUID; `turn_index` is what the transcript, the prompts, and
+  // every FieldValue.source_turn_ids actually speak in, and the graph
+  // artifact has to be readable without a database join to be usable for
+  // the report figures.
+  uint32 turn_index = 15;
 }
 
 // ThoughtEdge carries the heuristic weight (entity_overlap x edge_type_prior)
@@ -69,8 +124,13 @@ message ThoughtEdge {
   string src_thought_id = 4;
   string dst_thought_id = 5;
   EdgeType edge_type = 6;
-  float weight = 7;
+  float weight = 7;              // entity_overlap x edge_type_prior (ADR-0011)
   PredictedBy predicted_by = 8;
+
+  // One short model- or rule-supplied justification, kept for the case-study
+  // figures and for manually auditing whether LLM-predicted edges are
+  // defensible. Never consumed by retrieval or scoring.
+  string rationale = 9;
 }
 
 // ThoughtGraph is the nlp-service artifact serialized for graph-structured
@@ -80,4 +140,13 @@ message ThoughtGraph {
   string run_config_id = 2;
   repeated Thought thoughts = 3;
   repeated ThoughtEdge edges = 4;
+
+  // Provenance, so a serialized graph is self-describing for the report
+  // figures without re-joining run_configs: which prompt set produced it,
+  // which models, and how many turns it was built from.
+  string prompt_set_hash = 5;
+  string language = 6;
+  string construction_model = 7;   // base_model — thought construction
+  string edge_model = 8;           // structural_model — edge prediction
+  uint32 turn_count = 9;
 }

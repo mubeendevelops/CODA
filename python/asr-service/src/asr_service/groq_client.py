@@ -41,10 +41,22 @@ async def chat_json(
     failures and explicit classification of 429 as quota exhaustion
     (architecture.md §2.5 — parked, not counted against the retry budget).
     """
-    payload = {
+    payload: dict[str, object] = {
         "model": model,
         "temperature": 0,
         "response_format": {"type": "json_object"},
+        # See nlp_service.llm.groq.GroqLLMClient.complete's identical, more
+        # fully-documented fix (found live 2026-09-05): this classifier runs
+        # on qwen/qwen3.6-27b (decision #71), a Qwen3 hybrid think/no-think
+        # model whose default thinking mode both breaks JSON-mode validation
+        # (empty failed_generation 400s) and burns most of the output budget
+        # on hidden reasoning even for a trivial answer. "hidden" strips any
+        # reasoning trace from the visible content; "none" (Qwen3's
+        # documented non-thinking mode) turns the reasoning off entirely —
+        # role classification is closed-set structured extraction, no
+        # open-ended reasoning is being given up.
+        "reasoning_format": "hidden",
+        "reasoning_effort": "none",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},

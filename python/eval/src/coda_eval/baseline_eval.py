@@ -22,17 +22,15 @@ separate, larger piece of work, honestly left open rather than half-built.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypeVar
 
 import psycopg
 
-from coda.v1 import clinical_pb2
 from coda_eval import db, gold
 from coda_eval.metrics import field_scoring, summary_metrics
 from coda_eval.metrics.hallucination import (
@@ -42,8 +40,10 @@ from coda_eval.metrics.hallucination import (
     hallucination_rate,
     judge_claims,
 )
+from coda_eval.note_convert import note_to_fields_dict
 from coda_eval.registry import ManifestEntry
-from coda_worker_sdk.errors import FatalError, QuotaExhaustedError
+from coda_eval.retry import complete_with_quota_retry
+from coda_worker_sdk.errors import FatalError
 from nlp_service import db as nlp_db
 from nlp_service import prompts as nlp_prompts
 from nlp_service.extraction import run_extraction
@@ -51,11 +51,6 @@ from nlp_service.llm.client import LLMClient
 from nlp_service.summary import run_summary
 
 logger = logging.getLogger(__name__)
-
-_QUOTA_RETRY_DELAYS_S = (30.0, 60.0, 120.0)
-"""Bounded retry on QUOTA_EXHAUSTED — enough to ride out a transient
-per-minute throttle on a handful of items, not a multi-day pause (see
-module docstring's "not built here")."""
 
 _T = TypeVar("_T")
 
@@ -86,60 +81,6 @@ class ConsultationResult:
     a note that was never produced is simply not scored for this item."""
 
 
-def _note_to_fields_dict(note: clinical_pb2.ClinicalNote) -> dict[str, object]:
-    """Converts a real `ClinicalNote` proto back into the value/
-    source_turn_ids dict shape `field_scoring`/`gold_schema` share — the
-    inverse of `nlp_service.extraction._to_clinical_note`. Kept entirely
-    inside `coda_eval` (not a change to nlp-service's frozen Phase 4 code)."""
-
-    def fv(value: clinical_pb2.FieldValue) -> dict[str, object] | None:
-        if value.value == "":
-            return None
-        return {"value": value.value, "source_turn_ids": list(value.source_turn_ids)}
-
-    def fv_list(values: list[clinical_pb2.FieldValue]) -> list[dict[str, object]]:
-        out: list[dict[str, object]] = []
-        for v in values:
-            if v.value != "":
-                out.append({"value": v.value, "source_turn_ids": list(v.source_turn_ids)})
-        return out
-
-    return {
-        "chief_complaint": fv(note.chief_complaint) if note.HasField("chief_complaint") else None,
-        "hopi": fv(note.hopi) if note.HasField("hopi") else None,
-        "examination_findings": (
-            fv(note.examination_findings) if note.HasField("examination_findings") else None
-        ),
-        "treatment_plan": fv(note.treatment_plan) if note.HasField("treatment_plan") else None,
-        "past_medical_history": fv_list(list(note.past_medical_history)),
-        "medications": fv_list(list(note.medications_allergies.medications)),
-        "allergies": fv_list(list(note.medications_allergies.allergies)),
-        "provisional_diagnosis": fv_list(list(note.provisional_diagnosis)),
-        "investigations_advised": fv_list(list(note.investigations_advised)),
-    }
-
-
-async def _complete_with_quota_retry(
-    coro_factory: Callable[[], Awaitable[_T]], *, description: str
-) -> _T:
-    """Retries a QUOTA_EXHAUSTED failure a bounded number of times with a
-    fixed backoff schedule, re-raising if still exhausted after the last
-    attempt. `coro_factory` is a zero-arg callable returning a fresh
-    coroutine each call (a coroutine object can only be awaited once)."""
-    last_exc: QuotaExhaustedError | None = None
-    for delay in (0.0, *_QUOTA_RETRY_DELAYS_S):
-        if delay:
-            logger.warning("quota exhausted on %s, retrying in %.0fs", description, delay)
-            await asyncio.sleep(delay)
-        try:
-            return await coro_factory()
-        except QuotaExhaustedError as exc:
-            last_exc = exc
-            continue
-    assert last_exc is not None
-    raise last_exc
-
-
 async def run_one_consultation(
     *,
     item_id: str,
@@ -164,7 +105,7 @@ async def run_one_consultation(
     all_turn_ids = sorted(known_turn_ids)
 
     try:
-        extraction = await _complete_with_quota_retry(
+        extraction = await complete_with_quota_retry(
             lambda: run_extraction(
                 conn=async_conn,
                 llm_client=llm_client,
@@ -190,7 +131,7 @@ async def run_one_consultation(
     result.extraction_tokens_out = extraction.tokens_out
 
     try:
-        summary = await _complete_with_quota_retry(
+        summary = await complete_with_quota_retry(
             lambda: run_summary(
                 conn=async_conn,
                 llm_client=llm_client,
@@ -220,7 +161,7 @@ async def run_one_consultation(
         summary_text=summary.text,
     )
 
-    hyp_fields = _note_to_fields_dict(extraction.note)
+    hyp_fields = note_to_fields_dict(extraction.note)
     gold_fields = gold_data["fields"]
     assert isinstance(gold_fields, dict)
     result.field_counts = field_scoring.score_consultation(gold_fields, hyp_fields)
@@ -229,7 +170,7 @@ async def run_one_consultation(
 
     result.claims = claims_from_note(hyp_fields, result.hyp_summary, all_turn_ids=all_turn_ids)
     try:
-        result.verdicts = await _complete_with_quota_retry(
+        result.verdicts = await complete_with_quota_retry(
             lambda: judge_claims(
                 llm_client=llm_client,
                 model=judge_model,
@@ -725,10 +666,25 @@ def write_baseline_report_json(
                 "repair_attempts": r.repair_attempts,
                 "hallucination_rate": hallucination_rate(r.verdicts),
                 "n_claims_judged": len(r.verdicts),
+                # Per-item metrics, not just aggregates — the paired
+                # comparison (coda_eval.compare) needs one value per
+                # consultation per arm to bootstrap a confidence interval on
+                # the arm-to-arm difference. Aggregates alone cannot support
+                # that: a mean of 8 numbers carries no information about the
+                # spread across those 8 items.
+                "field_micro_f1": item_micro_f1(r.field_counts),
+                "rouge_l_f1": r.rouge_l.fmeasure if r.rouge_l else None,
+                "bertscore_f1": r.bertscore.f1 if r.bertscore else None,
                 "extraction_tokens_in": r.extraction_tokens_in,
                 "extraction_tokens_out": r.extraction_tokens_out,
                 "summary_tokens_in": r.summary_tokens_in,
                 "summary_tokens_out": r.summary_tokens_out,
+                "total_tokens": (
+                    r.extraction_tokens_in
+                    + r.extraction_tokens_out
+                    + r.summary_tokens_in
+                    + r.summary_tokens_out
+                ),
                 "wall_ms": r.wall_ms,
                 "error": r.error,
             }
@@ -739,6 +695,17 @@ def write_baseline_report_json(
     path.write_text(json_module.dumps(data, indent=2), encoding="utf-8")
 
 
+def item_micro_f1(field_counts: dict[str, field_scoring.FieldCounts]) -> float | None:
+    """One consultation's field-level micro F1 — the per-item value the
+    paired ablation comparison bootstraps over. Shared with `got_eval.py`
+    rather than duplicated, since both arms produce the same
+    `dict[str, FieldCounts]` shape from `field_scoring.score_consultation`.
+    """
+    if not field_counts:
+        return None
+    return field_scoring.aggregate([field_counts]).overall.f1()
+
+
 def _fmt(value: float | None) -> str:
     return "" if value is None else f"{value:.4f}"
 
@@ -746,6 +713,7 @@ def _fmt(value: float | None) -> str:
 __all__ = [
     "BaselineEvalSummary",
     "ConsultationResult",
+    "item_micro_f1",
     "load_gold_items",
     "run_baseline_eval",
     "run_one_consultation",

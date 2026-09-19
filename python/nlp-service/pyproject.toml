@@ -9,6 +9,12 @@ dependencies = [
     "httpx>=0.27,<1",
     "jsonschema>=4.23,<5",
     "psycopg[binary]>=3.2,<4",
+    # Module 5's consistency scorer (claude_context.md §4 pins
+    # all-MiniLM-L6-v2). Optional at runtime by design:
+    # nlp_service.reasoning.embeddings falls back to a deterministic lexical
+    # backend when the package or the model weights are unavailable, and
+    # records which one ran on every score (decision #97).
+    "sentence-transformers>=3.0,<4",
 ]
 
 [dependency-groups]
@@ -34,3 +40,7 @@ packages = ["src/nlp_service"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# `tests/` on the path so the graph tests can `from fixtures import
+# transcripts`. Without it pytest only inserts each test file's own
+# directory, and `tests/graph/*` cannot see `tests/fixtures/`.
+pythonpath = ["tests"]

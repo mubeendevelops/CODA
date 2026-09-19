@@ -15,7 +15,7 @@ class ScorerWeights(_message.Message):
     def __init__(self, relevance: _Optional[float] = ..., consistency: _Optional[float] = ..., redundancy: _Optional[float] = ...) -> None: ...
 
 class RunConfig(_message.Message):
-    __slots__ = ("arm", "schema_version", "base_model", "judge_model", "structural_model", "embed_model", "asr_backend", "asr_model", "got_enabled", "n_candidates", "k_iterations", "graph_context_enabled", "kg_enabled", "kg_backend", "scorer_weights", "temperature", "top_p", "seed", "prompt_set_hash", "redaction_enabled")
+    __slots__ = ("arm", "schema_version", "base_model", "judge_model", "structural_model", "embed_model", "asr_backend", "asr_model", "got_enabled", "n_candidates", "k_iterations", "graph_context_enabled", "kg_enabled", "kg_backend", "scorer_weights", "scorer_backend", "generation_context_tokens", "temperature", "top_p", "seed", "prompt_set_hash", "redaction_enabled")
     ARM_FIELD_NUMBER: _ClassVar[int]
     SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
     BASE_MODEL_FIELD_NUMBER: _ClassVar[int]
@@ -31,6 +31,8 @@ class RunConfig(_message.Message):
     KG_ENABLED_FIELD_NUMBER: _ClassVar[int]
     KG_BACKEND_FIELD_NUMBER: _ClassVar[int]
     SCORER_WEIGHTS_FIELD_NUMBER: _ClassVar[int]
+    SCORER_BACKEND_FIELD_NUMBER: _ClassVar[int]
+    GENERATION_CONTEXT_TOKENS_FIELD_NUMBER: _ClassVar[int]
     TEMPERATURE_FIELD_NUMBER: _ClassVar[int]
     TOP_P_FIELD_NUMBER: _ClassVar[int]
     SEED_FIELD_NUMBER: _ClassVar[int]
@@ -51,9 +53,11 @@ class RunConfig(_message.Message):
     kg_enabled: bool
     kg_backend: str
     scorer_weights: ScorerWeights
+    scorer_backend: str
+    generation_context_tokens: int
     temperature: float
     top_p: float
     seed: int
     prompt_set_hash: str
     redaction_enabled: bool
-    def __init__(self, arm: _Optional[str] = ..., schema_version: _Optional[int] = ..., base_model: _Optional[str] = ..., judge_model: _Optional[str] = ..., structural_model: _Optional[str] = ..., embed_model: _Optional[str] = ..., asr_backend: _Optional[str] = ..., asr_model: _Optional[str] = ..., got_enabled: bool = ..., n_candidates: _Optional[int] = ..., k_iterations: _Optional[int] = ..., graph_context_enabled: bool = ..., kg_enabled: bool = ..., kg_backend: _Optional[str] = ..., scorer_weights: _Optional[_Union[ScorerWeights, _Mapping]] = ..., temperature: _Optional[float] = ..., top_p: _Optional[float] = ..., seed: _Optional[int] = ..., prompt_set_hash: _Optional[str] = ..., redaction_enabled: bool = ...) -> None: ...
+    def __init__(self, arm: _Optional[str] = ..., schema_version: _Optional[int] = ..., base_model: _Optional[str] = ..., judge_model: _Optional[str] = ..., structural_model: _Optional[str] = ..., embed_model: _Optional[str] = ..., asr_backend: _Optional[str] = ..., asr_model: _Optional[str] = ..., got_enabled: bool = ..., n_candidates: _Optional[int] = ..., k_iterations: _Optional[int] = ..., graph_context_enabled: bool = ..., kg_enabled: bool = ..., kg_backend: _Optional[str] = ..., scorer_weights: _Optional[_Union[ScorerWeights, _Mapping]] = ..., scorer_backend: _Optional[str] = ..., generation_context_tokens: _Optional[int] = ..., temperature: _Optional[float] = ..., top_p: _Optional[float] = ..., seed: _Optional[int] = ..., prompt_set_hash: _Optional[str] = ..., redaction_enabled: bool = ...) -> None: ...

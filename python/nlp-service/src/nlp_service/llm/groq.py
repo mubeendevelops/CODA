@@ -57,6 +57,36 @@ class GroqLLMClient:
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
+            # Reasoning models wrap their answer in a hidden <think> trace by
+            # default. "hidden" returns only the final answer, which is all
+            # any json_mode caller in this codebase ever reads.
+            payload["reasoning_format"] = "hidden"
+            # Found live 2026-09-05 (coda-eval run-got-eval's first real run):
+            # a qwen/qwen3.6-27b edge-prediction call 400'd with
+            # code=json_validate_failed and an EMPTY failed_generation —
+            # raising max_tokens up to 4000+ made no difference. Root cause,
+            # isolated with a minimal curl request: Qwen3's hybrid think/
+            # no-think mode defaults to thinking even for a one-key JSON
+            # reply (445 of 454 completion tokens were hidden reasoning in
+            # that isolated test), and for this system's actual structured-
+            # extraction prompts the reasoning trace can apparently exceed
+            # any bounded max_tokens entirely, leaving zero tokens for the
+            # answer. `reasoning_effort: "none"` (Qwen3's documented
+            # non-thinking mode) confirmed live to fix this exactly — the
+            # same isolated request dropped from 454 completion tokens to 12
+            # with it set. None of this system's json_mode calls are
+            # open-ended reasoning tasks (they are all schema-constrained
+            # extraction/classification), so there is no quality reason to
+            # keep Qwen3's thinking mode on, and every reason to: it was
+            # actively breaking the request.
+            #
+            # Scoped to Qwen3 models only — gpt-oss (the judge/reference-
+            # label model) is a different reasoning implementation without a
+            # documented "none" effort level, and its existing scaled-
+            # max_tokens fix (coda_eval.metrics.hallucination, decision #75)
+            # was already validated live without needing this.
+            if model.startswith("qwen/"):
+                payload["reasoning_effort"] = "none"
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
         headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}

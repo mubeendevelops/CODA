@@ -1,0 +1,12 @@
+[
+  {
+    "content": "{\"thoughts\": [{\"turn_index\": 1, \"text_span\": \"it's my head, I've been getting these, uh, these headaches, like, at the back here\", \"text\": \"Headaches located at the back of the head\", \"entities\": [\"headache\", \"head\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": null, \"polarity\": \"asserted\", \"confidence\": 0.9}, {\"turn_index\": 3, \"text_span\": \"they come on in the, in the afternoon mostly, and then, uh, then they just, they stay\", \"text\": \"Headaches begin in the afternoon and persist\", \"entities\": [\"headache\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": \"afternoon\", \"polarity\": \"asserted\", \"confidence\": 0.8}, {\"turn_index\": 5, \"text_span\": \"Since, uh, since Tuesday, no, Monday. It was Monday\", \"text\": \"Headaches began on Monday\", \"entities\": [\"headache\"], \"clinical_category\": \"symptom\", \"temporal_anchor\": \"Monday\", \"polarity\": \"asserted\", \"confidence\": 0.9}, {\"turn_index\": 6, \"text_span\": \"I took some, um, some paracetamol, two of the, the five hundreds\", \"text\": \"Took paracetamol 500 mg, two tablets\", \"entities\": [\"paracetamol\"], \"clinical_category\": \"medication\", \"temporal_anchor\": null, \"polarity\": \"asserted\", \"confidence\": 0.9}, {\"turn_index\": 6, \"text_span\": \"but it didn't, it didn't really do much\", \"text\": \"Paracetamol gave little relief\", \"entities\": [\"paracetamol\"], \"clinical_category\": \"medication\", \"temporal_anchor\": null, \"polarity\": \"negated\", \"confidence\": 0.85}]}",
+    "tokens_in": 900,
+    "tokens_out": 450
+  },
+  {
+    "content": "{\"edges\": [{\"src_thought_id\": \"t1\", \"dst_thought_id\": \"t2\", \"edge_type\": \"elaboration\", \"confidence\": 0.9, \"rationale\": \"timing adds detail to the same headache\"}, {\"src_thought_id\": \"t1\", \"dst_thought_id\": \"t3\", \"edge_type\": \"elaboration\", \"confidence\": 0.9, \"rationale\": \"onset date adds detail to the same headache\"}, {\"src_thought_id\": \"t1\", \"dst_thought_id\": \"t4\", \"edge_type\": \"logical\", \"confidence\": 0.8, \"rationale\": \"paracetamol taken for the headache\"}, {\"src_thought_id\": \"t4\", \"dst_thought_id\": \"t5\", \"edge_type\": \"negation\", \"confidence\": 0.9, \"rationale\": \"the medication is reported as ineffective\"}]}",
+    "tokens_in": 400,
+    "tokens_out": 200
+  }
+]

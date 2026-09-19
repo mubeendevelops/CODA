@@ -25,7 +25,7 @@ from asr_service.audio import preprocess
 from asr_service.diarize import diarize as run_diarization
 from asr_service.diarize import load_pipeline
 from asr_service.transcribe import transcribe
-from coda_eval import acibench, baseline_eval, db, gold, mtsdialog, primock57
+from coda_eval import acibench, baseline_eval, compare, db, got_eval, gold, mtsdialog, primock57
 from coda_eval.config import (
     DATA_GOLD_DIR,
     DATA_REGISTRY_DIR,
@@ -447,6 +447,7 @@ def run_baseline_eval_cmd(limit: int | None, base_model: str, judge_model: str) 
 
     import psycopg
 
+    from coda_eval.llm_retry import RetryingLLMClient
     from nlp_service.llm.groq import GroqLLMClient
 
     groq_api_key = os.environ.get("GROQ_API_KEY", "")
@@ -466,7 +467,7 @@ def run_baseline_eval_cmd(limit: int | None, base_model: str, judge_model: str) 
         sys.exit(1)
     manifest_entries = {e.session_id: e for e in read_manifest(manifest_path)}
 
-    llm_client = GroqLLMClient(api_key=groq_api_key)
+    llm_client = RetryingLLMClient(GroqLLMClient(api_key=groq_api_key))
 
     try:
         sync_conn = db.connect(PostgresConfig.from_env())
@@ -508,6 +509,153 @@ def run_baseline_eval_cmd(limit: int | None, base_model: str, judge_model: str) 
         summary.n_schema_valid, summary.n_items, summary.hallucination_rate_overall,
         report_path, run_config_id or "(not persisted)", eval_run_id or "(not persisted)",
     )
+
+
+@main.command(name="run-got-eval")
+@click.option(
+    "--limit", type=int, default=None, help="Only process the first N gold-annotated items."
+)
+@click.option(
+    "--base-model", default="qwen/qwen3.8-27b",
+    help="System-under-test model — MUST match --base-model on run-baseline-eval, or the "
+    "comparison confounds graph reasoning with a model swap (claude_context.md decision #11).",
+)
+@click.option("--judge-model", default="openai/gpt-oss-20b", help="Hallucination-judge model.")
+@click.option(
+    "--structural-model", default="qwen/qwen3.6-27b",
+    help="Edge-prediction model — a separate Groq quota bucket from base_model (claude_context.md §8).",
+)
+def run_got_eval_cmd(
+    limit: int | None, base_model: str, judge_model: str, structural_model: str
+) -> None:
+    """Runs the real GoT-lite (got_k2) arm — thought construction, graph
+    assembly, N=3 candidate generation, K=2 refinement, distillation — against
+    every gold-annotated PriMock57 consultation and scores it identically to
+    `run-baseline-eval`. Requires a real GROQ_API_KEY, a reachable Postgres,
+    and a reachable MinIO (MINIO_PUBLIC_ENDPOINT) — this writes real stage
+    artifacts (thought graph, refinement traces, note), unlike the baseline
+    arm which writes none.
+    """
+    import asyncio
+
+    import psycopg
+
+    from coda_eval.storage import host_storage_client
+    from coda_eval.llm_retry import RetryingLLMClient
+    from nlp_service.llm.groq import GroqLLMClient
+
+    groq_api_key = os.environ.get("GROQ_API_KEY", "")
+    if not groq_api_key:
+        logger.error("GROQ_API_KEY is not set — this command makes real Groq API calls")
+        sys.exit(1)
+
+    gold_dir = REPO_ROOT / "data" / "gold" / "primock57"
+    if not gold_dir.is_dir() or not list(gold_dir.glob("*.gold.json")):
+        logger.error("no gold files under %s — run `coda-eval gold-scaffold` first", gold_dir)
+        sys.exit(1)
+
+    manifest_path = DATA_REGISTRY_DIR / f"{primock57.DATASET_NAME}.manifest.jsonl"
+    if not manifest_path.exists():
+        logger.error("no manifest at %s — run `coda-eval registry` first", manifest_path)
+        sys.exit(1)
+    manifest_entries = {e.session_id: e for e in read_manifest(manifest_path)}
+
+    llm_client = RetryingLLMClient(GroqLLMClient(api_key=groq_api_key))
+
+    try:
+        storage = host_storage_client()
+    except Exception as exc:
+        logger.error("could not construct MinIO client: %s", exc)
+        sys.exit(1)
+
+    try:
+        sync_conn = db.connect(PostgresConfig.from_env())
+    except Exception as exc:
+        logger.error("could not connect to Postgres (sync): %s", exc)
+        sys.exit(1)
+
+    try:
+        async_conn = asyncio.run(psycopg.AsyncConnection.connect(PostgresConfig.from_env().dsn()))
+    except Exception as exc:
+        logger.error("could not connect to Postgres (async): %s", exc)
+        sys.exit(1)
+
+    try:
+        results, summary, run_config_id, eval_run_id = asyncio.run(
+            got_eval.run_got_eval(
+                gold_dir=gold_dir,
+                manifest_entries=manifest_entries,
+                llm_client=llm_client,
+                storage=storage,
+                async_conn=async_conn,
+                sync_conn=sync_conn,
+                base_model=base_model,
+                judge_model=judge_model,
+                structural_model=structural_model,
+                limit=limit,
+            )
+        )
+    finally:
+        asyncio.run(async_conn.close())
+        sync_conn.close()
+
+    report_path = DOCS_EVAL_DIR / "got_report.md"
+    got_eval.write_got_report(results, summary, report_path)
+    got_eval.write_got_report_json(results, summary, DOCS_EVAL_DIR / "got_report.json")
+    logger.info(
+        "done: %d/%d completed without error, hallucination_rate=%s, report written to %s "
+        "(run_config_id=%s, eval_run_id=%s)",
+        summary.n_items - summary.n_errors, summary.n_items, summary.hallucination_rate_overall,
+        report_path, run_config_id or "(not persisted)", eval_run_id or "(not persisted)",
+    )
+
+
+@main.command(name="compare-ablation")
+@click.option(
+    "--baseline-json", default=None, type=click.Path(exists=True),
+    help="Defaults to docs/eval/baseline_report.json (run-baseline-eval's output).",
+)
+@click.option(
+    "--got-json", default=None, type=click.Path(exists=True),
+    help="Defaults to docs/eval/got_report.json (run-got-eval's output).",
+)
+@click.option(
+    "--out", default=None, type=click.Path(),
+    help="Defaults to docs/eval/got_ablation_v1.md.",
+)
+def compare_ablation_cmd(baseline_json: str | None, got_json: str | None, out: str | None) -> None:
+    """Produces the headline single-pass-baseline-vs-GoT-lite ablation table
+    from two already-run reports (`run-baseline-eval` and `run-got-eval`'s
+    JSON output) — paired per-consultation comparison, bootstrap confidence
+    intervals, and an explicit N-too-small flag (plan.md Phase 10's headline
+    table, statistical-honesty requirement). No live model calls — this is
+    pure offline analysis over the two JSON snapshots.
+    """
+    baseline_path = Path(baseline_json) if baseline_json else DOCS_EVAL_DIR / "baseline_report.json"
+    got_path = Path(got_json) if got_json else DOCS_EVAL_DIR / "got_report.json"
+    out_path = Path(out) if out else DOCS_EVAL_DIR / "got_ablation_v1.md"
+
+    if not baseline_path.exists():
+        logger.error("no baseline report at %s — run `coda-eval run-baseline-eval` first", baseline_path)
+        sys.exit(1)
+    if not got_path.exists():
+        logger.error("no GoT-lite report at %s — run `coda-eval run-got-eval` first", got_path)
+        sys.exit(1)
+
+    baseline = compare.load_report(baseline_path)
+    got = compare.load_report(got_path)
+    comparisons = compare.compare_reports(baseline, got)
+    compare.write_ablation_report(
+        baseline, got, comparisons, out_path,
+        baseline_json_path=baseline_path, got_json_path=got_path,
+    )
+    logger.info("ablation report written to %s", out_path)
+    for c in comparisons:
+        logger.info(
+            "  %s: baseline=%s got=%s diff=%s ci=%s N=%d%s",
+            c.metric, c.baseline_mean, c.got_mean, c.diff_mean, c.diff_ci, c.n_paired,
+            " [INSUFFICIENT N]" if c.insufficient_n else "",
+        )
 
 
 if __name__ == "__main__":

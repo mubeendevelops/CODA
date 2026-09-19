@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from coda.v1 import transcript_pb2 as coda_dot_v1_dot_transcript__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x63oda/v1/thought.proto\x12\x07\x63oda.v1\x1a\x18\x63oda/v1/transcript.proto\"V\n\x0cLinkedEntity\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x0f\n\x07mesh_id\x18\x02 \x01(\t\x12\x12\n\nicd10_code\x18\x03 \x01(\t\x12\x13\n\x0b\x65ntity_type\x18\x04 \x01(\t\"\x92\x02\n\x07Thought\x12\n\n\x02id\x18\x01 \x01(\t\x12\x17\n\x0f\x63onsultation_id\x18\x02 \x01(\t\x12\x15\n\rrun_config_id\x18\x03 \x01(\t\x12\x0f\n\x07turn_id\x18\x04 \x01(\t\x12%\n\x07speaker\x18\x05 \x01(\x0e\x32\x14.coda.v1.SpeakerRole\x12\x0c\n\x04text\x18\x06 \x01(\t\x12\'\n\x08\x65ntities\x18\x07 \x03(\x0b\x32\x15.coda.v1.LinkedEntity\x12*\n\x08\x63\x61tegory\x18\x08 \x01(\x0e\x32\x18.coda.v1.ThoughtCategory\x12\x17\n\x0ftemporal_anchor\x18\t \x01(\t\x12\x17\n\x0flinked_concepts\x18\n \x03(\t\"\xdb\x01\n\x0bThoughtEdge\x12\n\n\x02id\x18\x01 \x01(\t\x12\x17\n\x0f\x63onsultation_id\x18\x02 \x01(\t\x12\x15\n\rrun_config_id\x18\x03 \x01(\t\x12\x16\n\x0esrc_thought_id\x18\x04 \x01(\t\x12\x16\n\x0e\x64st_thought_id\x18\x05 \x01(\t\x12$\n\tedge_type\x18\x06 \x01(\x0e\x32\x11.coda.v1.EdgeType\x12\x0e\n\x06weight\x18\x07 \x01(\x02\x12*\n\x0cpredicted_by\x18\x08 \x01(\x0e\x32\x14.coda.v1.PredictedBy\"\x87\x01\n\x0cThoughtGraph\x12\x17\n\x0f\x63onsultation_id\x18\x01 \x01(\t\x12\x15\n\rrun_config_id\x18\x02 \x01(\t\x12\"\n\x08thoughts\x18\x03 \x03(\x0b\x32\x10.coda.v1.Thought\x12#\n\x05\x65\x64ges\x18\x04 \x03(\x0b\x32\x14.coda.v1.ThoughtEdge*\xcb\x02\n\x0fThoughtCategory\x12 \n\x1cTHOUGHT_CATEGORY_UNSPECIFIED\x10\x00\x12\x1c\n\x18THOUGHT_CATEGORY_SYMPTOM\x10\x01\x12\x1c\n\x18THOUGHT_CATEGORY_HISTORY\x10\x02\x12\x1f\n\x1bTHOUGHT_CATEGORY_MEDICATION\x10\x03\x12\x1c\n\x18THOUGHT_CATEGORY_ALLERGY\x10\x04\x12 \n\x1cTHOUGHT_CATEGORY_EXAMINATION\x10\x05\x12\x1e\n\x1aTHOUGHT_CATEGORY_DIAGNOSIS\x10\x06\x12\"\n\x1eTHOUGHT_CATEGORY_INVESTIGATION\x10\x07\x12\x19\n\x15THOUGHT_CATEGORY_PLAN\x10\x08\x12\x1a\n\x16THOUGHT_CATEGORY_OTHER\x10\t*j\n\x08\x45\x64geType\x12\x19\n\x15\x45\x44GE_TYPE_UNSPECIFIED\x10\x00\x12\x16\n\x12\x45\x44GE_TYPE_TEMPORAL\x10\x01\x12\x14\n\x10\x45\x44GE_TYPE_CAUSAL\x10\x02\x12\x15\n\x11\x45\x44GE_TYPE_LOGICAL\x10\x03*X\n\x0bPredictedBy\x12\x1c\n\x18PREDICTED_BY_UNSPECIFIED\x10\x00\x12\x15\n\x11PREDICTED_BY_RULE\x10\x01\x12\x14\n\x10PREDICTED_BY_LLM\x10\x02\x42*Z(coda/go/internal/genproto/coda/v1;codev1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x63oda/v1/thought.proto\x12\x07\x63oda.v1\x1a\x18\x63oda/v1/transcript.proto\"V\n\x0cLinkedEntity\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x0f\n\x07mesh_id\x18\x02 \x01(\t\x12\x12\n\nicd10_code\x18\x03 \x01(\t\x12\x13\n\x0b\x65ntity_type\x18\x04 \x01(\t\"\x85\x03\n\x07Thought\x12\n\n\x02id\x18\x01 \x01(\t\x12\x17\n\x0f\x63onsultation_id\x18\x02 \x01(\t\x12\x15\n\rrun_config_id\x18\x03 \x01(\t\x12\x0f\n\x07turn_id\x18\x04 \x01(\t\x12%\n\x07speaker\x18\x05 \x01(\x0e\x32\x14.coda.v1.SpeakerRole\x12\x0c\n\x04text\x18\x06 \x01(\t\x12\'\n\x08\x65ntities\x18\x07 \x03(\x0b\x32\x15.coda.v1.LinkedEntity\x12*\n\x08\x63\x61tegory\x18\x08 \x01(\x0e\x32\x18.coda.v1.ThoughtCategory\x12\x17\n\x0ftemporal_anchor\x18\t \x01(\t\x12\x17\n\x0flinked_concepts\x18\n \x03(\t\x12#\n\x08polarity\x18\x0b \x01(\x0e\x32\x11.coda.v1.Polarity\x12\x12\n\nconfidence\x18\x0c \x01(\x02\x12\x12\n\nchar_start\x18\r \x01(\r\x12\x10\n\x08\x63har_end\x18\x0e \x01(\r\x12\x12\n\nturn_index\x18\x0f \x01(\r\"\xee\x01\n\x0bThoughtEdge\x12\n\n\x02id\x18\x01 \x01(\t\x12\x17\n\x0f\x63onsultation_id\x18\x02 \x01(\t\x12\x15\n\rrun_config_id\x18\x03 \x01(\t\x12\x16\n\x0esrc_thought_id\x18\x04 \x01(\t\x12\x16\n\x0e\x64st_thought_id\x18\x05 \x01(\t\x12$\n\tedge_type\x18\x06 \x01(\x0e\x32\x11.coda.v1.EdgeType\x12\x0e\n\x06weight\x18\x07 \x01(\x02\x12*\n\x0cpredicted_by\x18\x08 \x01(\x0e\x32\x14.coda.v1.PredictedBy\x12\x11\n\trationale\x18\t \x01(\t\"\xf6\x01\n\x0cThoughtGraph\x12\x17\n\x0f\x63onsultation_id\x18\x01 \x01(\t\x12\x15\n\rrun_config_id\x18\x02 \x01(\t\x12\"\n\x08thoughts\x18\x03 \x03(\x0b\x32\x10.coda.v1.Thought\x12#\n\x05\x65\x64ges\x18\x04 \x03(\x0b\x32\x14.coda.v1.ThoughtEdge\x12\x17\n\x0fprompt_set_hash\x18\x05 \x01(\t\x12\x10\n\x08language\x18\x06 \x01(\t\x12\x1a\n\x12\x63onstruction_model\x18\x07 \x01(\t\x12\x12\n\nedge_model\x18\x08 \x01(\t\x12\x12\n\nturn_count\x18\t \x01(\r*\xcb\x02\n\x0fThoughtCategory\x12 \n\x1cTHOUGHT_CATEGORY_UNSPECIFIED\x10\x00\x12\x1c\n\x18THOUGHT_CATEGORY_SYMPTOM\x10\x01\x12\x1c\n\x18THOUGHT_CATEGORY_HISTORY\x10\x02\x12\x1f\n\x1bTHOUGHT_CATEGORY_MEDICATION\x10\x03\x12\x1c\n\x18THOUGHT_CATEGORY_ALLERGY\x10\x04\x12 \n\x1cTHOUGHT_CATEGORY_EXAMINATION\x10\x05\x12\x1e\n\x1aTHOUGHT_CATEGORY_DIAGNOSIS\x10\x06\x12\"\n\x1eTHOUGHT_CATEGORY_INVESTIGATION\x10\x07\x12\x19\n\x15THOUGHT_CATEGORY_PLAN\x10\x08\x12\x1a\n\x16THOUGHT_CATEGORY_OTHER\x10\t*\xb8\x01\n\x08\x45\x64geType\x12\x19\n\x15\x45\x44GE_TYPE_UNSPECIFIED\x10\x00\x12\x16\n\x12\x45\x44GE_TYPE_TEMPORAL\x10\x01\x12\x14\n\x10\x45\x44GE_TYPE_CAUSAL\x10\x02\x12\x15\n\x11\x45\x44GE_TYPE_LOGICAL\x10\x03\x12\x16\n\x12\x45\x44GE_TYPE_NEGATION\x10\x04\x12\x19\n\x15\x45\x44GE_TYPE_ELABORATION\x10\x05\x12\x19\n\x15\x45\x44GE_TYPE_COREFERENCE\x10\x06*\x84\x01\n\x08Polarity\x12\x18\n\x14POLARITY_UNSPECIFIED\x10\x00\x12\x15\n\x11POLARITY_ASSERTED\x10\x01\x12\x14\n\x10POLARITY_NEGATED\x10\x02\x12\x16\n\x12POLARITY_UNCERTAIN\x10\x03\x12\x19\n\x15POLARITY_HYPOTHETICAL\x10\x04*X\n\x0bPredictedBy\x12\x1c\n\x18PREDICTED_BY_UNSPECIFIED\x10\x00\x12\x15\n\x11PREDICTED_BY_RULE\x10\x01\x12\x14\n\x10PREDICTED_BY_LLM\x10\x02\x42*Z(coda/go/internal/genproto/coda/v1;codev1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,18 +33,20 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'coda.v1.thought_pb2', _glob
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z(coda/go/internal/genproto/coda/v1;codev1'
-  _globals['_THOUGHTCATEGORY']._serialized_start=786
-  _globals['_THOUGHTCATEGORY']._serialized_end=1117
-  _globals['_EDGETYPE']._serialized_start=1119
-  _globals['_EDGETYPE']._serialized_end=1225
-  _globals['_PREDICTEDBY']._serialized_start=1227
-  _globals['_PREDICTEDBY']._serialized_end=1315
+  _globals['_THOUGHTCATEGORY']._serialized_start=1031
+  _globals['_THOUGHTCATEGORY']._serialized_end=1362
+  _globals['_EDGETYPE']._serialized_start=1365
+  _globals['_EDGETYPE']._serialized_end=1549
+  _globals['_POLARITY']._serialized_start=1552
+  _globals['_POLARITY']._serialized_end=1684
+  _globals['_PREDICTEDBY']._serialized_start=1686
+  _globals['_PREDICTEDBY']._serialized_end=1774
   _globals['_LINKEDENTITY']._serialized_start=60
   _globals['_LINKEDENTITY']._serialized_end=146
   _globals['_THOUGHT']._serialized_start=149
-  _globals['_THOUGHT']._serialized_end=423
-  _globals['_THOUGHTEDGE']._serialized_start=426
-  _globals['_THOUGHTEDGE']._serialized_end=645
-  _globals['_THOUGHTGRAPH']._serialized_start=648
-  _globals['_THOUGHTGRAPH']._serialized_end=783
+  _globals['_THOUGHT']._serialized_end=538
+  _globals['_THOUGHTEDGE']._serialized_start=541
+  _globals['_THOUGHTEDGE']._serialized_end=779
+  _globals['_THOUGHTGRAPH']._serialized_start=782
+  _globals['_THOUGHTGRAPH']._serialized_end=1028
 # @@protoc_insertion_point(module_scope)
